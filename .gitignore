@@ -201,3 +201,7 @@ ecommerce-system/backend/services/*/node_modules/
 # Python cache
 ecommerce-system/backend/services/ai-search-service/src/__pycache__/
 ecommerce-system/backend/services/ai-search-service/src/*/__pycache__/
+
+# Documentation and templates (excluded from version control)
+docs/
+design_templates/
