@@ -205,3 +205,7 @@ ecommerce-system/backend/services/ai-search-service/src/*/__pycache__/
 # Documentation and templates (excluded from version control)
 docs/
 design_templates/
+
+# Development configuration files (excluded from version control)
+.kiro/
+.cursorrules
