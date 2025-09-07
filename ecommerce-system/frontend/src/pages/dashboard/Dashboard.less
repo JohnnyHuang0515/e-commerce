@@ -1,0 +1,94 @@
+@import "@/styles/variables.less";
+
+// 📊 儀表板頁面樣式
+
+.dashboard-page {
+  .dashboard-content {
+    .stats-row {
+      margin-bottom: @spacing-8;
+    }
+    
+    .charts-row {
+      margin-bottom: @spacing-8;
+      
+      .chart-card {
+        height: 400px;
+        
+        .ant-card-body {
+          height: calc(100% - 57px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .chart-placeholder {
+          text-align: center;
+          color: @text-secondary;
+          font-size: @font-size-lg;
+        }
+      }
+    }
+    
+    .activity-row {
+      .activity-card {
+        height: 300px;
+        
+        .ant-card-body {
+          height: calc(100% - 57px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .activity-placeholder {
+          text-align: center;
+          color: @text-secondary;
+          font-size: @font-size-base;
+        }
+      }
+    }
+  }
+}
+
+// 響應式設計
+@media (max-width: @screen-sm) {
+  .dashboard-page {
+    .dashboard-content {
+      .stats-row {
+        margin-bottom: @spacing-6;
+      }
+      
+      .charts-row {
+        margin-bottom: @spacing-6;
+        
+        .chart-card {
+          height: 300px;
+        }
+      }
+      
+      .activity-row {
+        .activity-card {
+          height: 250px;
+        }
+      }
+    }
+  }
+}
+
+@media (min-width: @screen-sm) and (max-width: @screen-md) {
+  .dashboard-page {
+    .dashboard-content {
+      .charts-row {
+        .chart-card {
+          height: 350px;
+        }
+      }
+      
+      .activity-row {
+        .activity-card {
+          height: 280px;
+        }
+      }
+    }
+  }
+}

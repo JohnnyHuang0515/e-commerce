@@ -1,0 +1,100 @@
+@import "@/styles/variables.less";
+
+// 📄 頁面標題樣式
+
+.page-header {
+  margin-bottom: @spacing-6;
+  
+  .custom-page-header {
+    background: @bg-primary;
+    border-radius: @radius-lg;
+    box-shadow: @shadow-sm;
+    border: 1px solid @border-secondary;
+    padding: @spacing-6;
+    
+    .page-header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: @spacing-4;
+      
+      .back-btn {
+        margin-right: @spacing-4;
+        color: @text-secondary;
+        
+        &:hover {
+          color: @primary-500;
+        }
+      }
+      
+      .page-header-title {
+        flex: 1;
+        
+        .title {
+          font-size: @font-size-xxl;
+          font-weight: @font-weight-semibold;
+          color: @text-primary;
+          margin: 0 0 @spacing-2 0;
+        }
+        
+        .subtitle {
+          font-size: @font-size-base;
+          color: @text-secondary;
+          margin: 0;
+        }
+      }
+      
+      .page-header-extra {
+        margin-left: @spacing-4;
+      }
+    }
+    
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: @spacing-2;
+      
+      .breadcrumb-item {
+        display: flex;
+        align-items: center;
+        gap: @spacing-2;
+        
+        .breadcrumb-link {
+          padding: 0;
+          height: auto;
+          color: @text-secondary;
+          
+          &:hover {
+            color: @primary-500;
+          }
+        }
+        
+        .separator {
+          color: @text-disabled;
+        }
+      }
+    }
+  }
+}
+
+// 響應式設計
+@media (max-width: @screen-sm) {
+  .page-header {
+    margin-bottom: @spacing-4;
+    
+    .custom-page-header {
+      padding: @spacing-4;
+      
+      .ant-page-header-heading {
+        .ant-page-header-heading-title {
+          font-size: @font-size-xl;
+        }
+      }
+      
+      .ant-page-header-extra {
+        margin-left: @spacing-2;
+        margin-top: @spacing-2;
+      }
+    }
+  }
+}

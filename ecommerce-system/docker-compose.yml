@@ -1,0 +1,241 @@
+version: '3.8'
+
+services:
+  # MongoDB 資料庫 (商品服務專用)
+  mongodb:
+    image: mongo:7.0
+    container_name: ecommerce-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: ecommerce
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - ecommerce-network
+
+  # PostgreSQL 資料庫 (交易資料專用)
+  postgresql:
+    image: postgres:15-alpine
+    container_name: ecommerce-postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecommerce_transactions
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./scripts/postgres-schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./scripts/postgres-seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d ecommerce_transactions"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Product Service
+  product-service:
+    build: ./backend/services/product-service
+    container_name: ecommerce-product-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/ecommerce?authSource=admin
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/product-service:/app
+      - /app/node_modules
+
+  # Redis 快取
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+
+  # AI Search Service
+  ai-search-service:
+    build: ./backend/services/ai-search-service
+    container_name: ecommerce-ai-search-service
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: development
+      DEBUG: "true"
+      HOST: 0.0.0.0
+      PORT: 3014
+      MILVUS_HOST: localhost
+      MILVUS_PORT: 19530
+      MILVUS_COLLECTION_NAME: product_vectors
+      MILVUS_DIMENSION: 384
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_CACHE_TTL: 3600
+      PRODUCT_SERVICE_URL: http://product-service:3001
+      MODEL_NAME: sentence-transformers/all-MiniLM-L6-v2
+      MODEL_CACHE_DIR: /app/models
+      DEFAULT_SEARCH_LIMIT: 20
+      MAX_SEARCH_LIMIT: 100
+      SIMILARITY_THRESHOLD: 0.7
+      LOG_LEVEL: INFO
+      LOG_FILE: /app/logs/ai-search-service.log
+      BATCH_SIZE: 32
+      MAX_CONCURRENT_REQUESTS: 10
+    ports:
+      - "3014:3014"
+    depends_on:
+      - redis
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/ai-search-service:/app
+      - ai_search_models:/app/models
+      - ai_search_logs:/app/logs
+
+  # Log Service
+  log-service:
+    build: ./backend/services/log-service
+    container_name: ecommerce-log-service
+    restart: unless-stopped
+    environment:
+      - PORT=3018
+      - WS_PORT=3020
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/ecommerce_logs
+      - LOG_LEVEL=info
+      - LOG_RETENTION_DAYS=30
+      - SERVICE_NAME=log-service
+      - SERVICE_VERSION=1.0.0
+    ports:
+      - "3018:3018"
+      - "3020:3020"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/log-service:/app
+      - log_service_logs:/app/logs
+
+  # Notification Service
+  notification-service:
+    build: ./backend/services/notification-service
+    container_name: ecommerce-notification-service
+    restart: unless-stopped
+    environment:
+      - PORT=3017
+      - SOCKET_PORT=3016
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/ecommerce_notifications
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_SECURE=false
+      - SMTP_USER=your-email@gmail.com
+      - SMTP_PASS=your-app-password
+      - SMTP_FROM=noreply@ecommerce.com
+      - SOCKET_CORS_ORIGIN=http://localhost:3000
+      - LOG_LEVEL=info
+      - LOG_RETENTION_DAYS=30
+      - SERVICE_NAME=notification-service
+      - SERVICE_VERSION=1.0.0
+    ports:
+      - "3017:3017"
+      - "3016:3016"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/notification-service:/app
+      - notification_service_logs:/app/logs
+
+  # Utility Service
+  utility-service:
+    build: ./backend/services/utility-service
+    container_name: ecommerce-utility-service
+    restart: unless-stopped
+    environment:
+      - PORT=3019
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/ecommerce_utility
+      - UPLOAD_DIR=/app/uploads
+      - BACKUP_DIR=/app/backups
+      - MAX_FILE_SIZE=104857600
+      - ALLOWED_FILE_TYPES=jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,csv,txt,zip,rar
+      - MAX_FILES_PER_REQUEST=10
+      - IMAGE_RESIZE_ENABLED=true
+      - IMAGE_QUALITY=80
+      - IMAGE_MAX_WIDTH=1920
+      - IMAGE_MAX_HEIGHT=1080
+      - BACKUP_RETENTION_DAYS=30
+      - LOG_LEVEL=info
+      - LOG_RETENTION_DAYS=30
+      - SERVICE_NAME=utility-service
+      - SERVICE_VERSION=1.0.0
+    ports:
+      - "3019:3019"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/utility-service:/app
+      - utility_service_logs:/app/logs
+      - utility_uploads:/app/uploads
+      - utility_backups:/app/backups
+
+  # MongoDB Express (可選的管理介面)
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: ecommerce-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: password123
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+
+volumes:
+  mongodb_data:
+  postgresql_data:
+  redis_data:
+  ai_search_models:
+  ai_search_logs:
+  log_service_logs:
+  notification_service_logs:
+  utility_service_logs:
+  utility_uploads:
+  utility_backups:
+
+networks:
+  ecommerce-network:
+    driver: bridge

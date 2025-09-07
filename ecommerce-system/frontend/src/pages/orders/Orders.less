@@ -1,0 +1,93 @@
+@import "@/styles/variables.less";
+
+// 📦 訂單管理頁面樣式
+
+.orders-page {
+  .stats-row {
+    margin-bottom: @spacing-6;
+    
+    .stat-item {
+      text-align: center;
+      
+      .stat-value {
+        font-size: @font-size-xxl;
+        font-weight: @font-weight-bold;
+        color: @text-primary;
+        margin-bottom: @spacing-1;
+      }
+      
+      .stat-label {
+        font-size: @font-size-sm;
+        color: @text-secondary;
+      }
+    }
+  }
+
+  .orders-content {
+    .orders-filters {
+      margin-bottom: @spacing-6;
+      padding: @spacing-4;
+      background: @bg-primary;
+      border-radius: @radius-lg;
+      border: 1px solid @border-secondary;
+    }
+  }
+}
+
+// 響應式設計
+@media (max-width: @screen-sm) {
+  .orders-page {
+    .stats-row {
+      margin-bottom: @spacing-4;
+      
+      .stat-item {
+        .stat-value {
+          font-size: @font-size-xl;
+        }
+      }
+    }
+    
+    .orders-content {
+      .orders-filters {
+        padding: @spacing-3;
+        
+        .ant-row {
+          .ant-col {
+            margin-bottom: @spacing-2;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 表格樣式優化
+.orders-page {
+  .ant-table {
+    .ant-table-thead > tr > th {
+      background: @bg-secondary;
+      font-weight: @font-weight-semibold;
+    }
+    
+    .ant-table-tbody > tr:hover > td {
+      background: @bg-secondary;
+    }
+  }
+}
+
+// 標籤樣式
+.orders-page {
+  .ant-tag {
+    border-radius: @radius-sm;
+    font-size: @font-size-xs;
+  }
+}
+
+// 徽章樣式
+.orders-page {
+  .ant-badge {
+    .ant-badge-count {
+      font-size: @font-size-xs;
+    }
+  }
+}

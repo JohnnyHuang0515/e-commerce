@@ -1,0 +1,62 @@
+@import "@/styles/variables.less";
+
+// 🛍️ 商品管理頁面樣式
+
+.products-page {
+  .products-content {
+    .products-filters {
+      margin-bottom: @spacing-6;
+      padding: @spacing-4;
+      background: @bg-primary;
+      border-radius: @radius-lg;
+      border: 1px solid @border-secondary;
+    }
+  }
+}
+
+// 響應式設計
+@media (max-width: @screen-sm) {
+  .products-page {
+    .products-content {
+      .products-filters {
+        padding: @spacing-3;
+        
+        .ant-row {
+          .ant-col {
+            margin-bottom: @spacing-2;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 表格樣式優化
+.products-page {
+  .ant-table {
+    .ant-table-thead > tr > th {
+      background: @bg-secondary;
+      font-weight: @font-weight-semibold;
+    }
+    
+    .ant-table-tbody > tr:hover > td {
+      background: @bg-secondary;
+    }
+  }
+}
+
+// 標籤樣式
+.products-page {
+  .ant-tag {
+    border-radius: @radius-sm;
+    font-size: @font-size-xs;
+  }
+}
+
+// 圖片樣式
+.products-page {
+  .ant-image {
+    border-radius: @radius-sm;
+    overflow: hidden;
+  }
+}

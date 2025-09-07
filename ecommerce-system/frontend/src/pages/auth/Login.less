@@ -1,0 +1,233 @@
+@import "@/styles/variables.less";
+
+// ====================================================
+// 登入頁面 - 雙主題玻璃形態設計
+// ====================================================
+
+.login-background {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  transition: background 0.5s ease;
+}
+
+.login-content {
+  width: 100%;
+  max-width: 1000px;
+}
+
+// ----------------------------------------------------
+// 淺色主題 (Light Theme)
+// ----------------------------------------------------
+[data-theme='light'] {
+  .login-background {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e9f1f8 100%);
+  }
+
+  .login-card {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    padding: 80px 64px;
+  }
+
+  .logo-icon {
+    color: @primary-500;
+    filter: drop-shadow(0 0 10px rgba(24, 144, 255, 0.2));
+  }
+
+  .logo-title {
+    color: @text-primary;
+  }
+
+  .login-subtitle {
+    color: @text-secondary;
+  }
+
+  .ant-form-item-label > label {
+    color: @text-primary !important;
+  }
+
+  .login-input {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    color: @text-primary;
+
+    .ant-input-prefix {
+      color: @text-secondary;
+    }
+
+    &::placeholder {
+      color: @text-secondary;
+    }
+
+    &:hover {
+      border-color: @primary-400;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    &:focus {
+      border-color: @primary-500;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    }
+  }
+
+  .login-button {
+    background: linear-gradient(135deg, @primary-400 0%, @primary-600 100%);
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(24, 144, 255, 0.3);
+    }
+  }
+
+  .login-footer {
+    color: @text-secondary;
+    border-top: 1px solid @border-secondary;
+  }
+}
+
+// ----------------------------------------------------
+// 深色主題 (Dark Theme) - 您現有的樣式
+// ----------------------------------------------------
+[data-theme='dark'] {
+  .login-background {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  }
+
+  .login-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 80px 64px;
+  }
+
+  .logo-icon {
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    filter: drop-shadow(0 0 10px rgba(24, 144, 255, 0.3));
+  }
+
+  .logo-title {
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  .login-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  .ant-form-item-label > label {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  .login-input {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+
+    .ant-input-prefix {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    &:hover {
+      border-color: rgba(24, 144, 255, 0.5);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    &:focus {
+      border-color: rgba(24, 144, 255, 0.8);
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    }
+  }
+
+  .login-button {
+    background: linear-gradient(135deg, rgba(24, 144, 255, 0.8) 0%, rgba(9, 109, 217, 0.8) 100%);
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(24, 144, 255, 0.4);
+    }
+  }
+
+  .login-footer {
+    color: rgba(255, 255, 255, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+// ----------------------------------------------------
+// 通用樣式 (不受主題影響)
+// ----------------------------------------------------
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+  padding-top: 8px;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.logo-icon {
+  font-size: 56px;
+  margin-right: 20px;
+}
+
+.logo-title {
+  margin: 0 !important;
+  font-weight: 700;
+  font-size: 2.5rem;
+}
+
+.login-subtitle {
+  font-size: 20px;
+  opacity: 0.9;
+}
+
+.login-form {
+  position: relative;
+  z-index: 2;
+}
+
+.login-button {
+  height: 52px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.login-footer {
+  text-align: center;
+  padding-top: 16px;
+}
+
+// 動畫
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-card {
+  animation: fadeInUp 0.6s ease-out;
+}

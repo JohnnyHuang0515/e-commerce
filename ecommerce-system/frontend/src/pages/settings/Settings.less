@@ -1,0 +1,72 @@
+@import "@/styles/variables.less";
+
+// ⚙️ 系統設定頁面樣式
+
+.settings-page {
+  .settings-content {
+    .ant-tabs {
+      .ant-tabs-tab {
+        .anticon {
+          margin-right: @spacing-2;
+        }
+      }
+    }
+    
+    .settings-actions {
+      text-align: center;
+      padding: @spacing-6 0;
+      border-top: 1px solid @border-secondary;
+      margin-top: @spacing-6;
+    }
+  }
+}
+
+// 響應式設計
+@media (max-width: @screen-sm) {
+  .settings-page {
+    .settings-content {
+      .ant-tabs {
+        .ant-tabs-tab {
+          padding: @spacing-2 @spacing-3;
+          font-size: @font-size-sm;
+        }
+      }
+      
+      .settings-actions {
+        padding: @spacing-4 0;
+        margin-top: @spacing-4;
+      }
+    }
+  }
+}
+
+// 表單樣式優化
+.settings-page {
+  .ant-form-item-label {
+    font-weight: @font-weight-medium;
+  }
+  
+  .ant-upload {
+    .ant-upload-select-picture-card {
+      border-radius: @radius-md;
+    }
+  }
+  
+  .ant-input-number {
+    border-radius: @radius-md;
+  }
+  
+  .ant-switch {
+    &.ant-switch-checked {
+      background-color: @primary-500;
+    }
+  }
+}
+
+// 分割線樣式
+.settings-page {
+  .ant-divider {
+    margin: @spacing-6 0;
+    border-color: @border-secondary;
+  }
+}

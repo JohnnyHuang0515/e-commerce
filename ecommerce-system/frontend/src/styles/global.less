@@ -1,0 +1,89 @@
+@import "@/styles/variables.less";
+
+// 🌐 全局樣式
+// 該檔案只負責結構和佈局，所有顏色均來自 variables.less 中的 CSS 變數。
+
+// 重置樣式
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: @font-size-base;
+  line-height: @line-height-normal;
+}
+
+body {
+  font-family: @font-family;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  // 平滑的色彩過渡效果
+  transition: background-color @transition-normal ease, color @transition-normal ease;
+}
+
+// 卡片樣式
+.card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: @radius-lg;
+  padding: @spacing-6;
+  box-shadow: @shadow-sm;
+  transition: box-shadow @transition-normal ease, background-color @transition-normal ease, border-color @transition-normal ease;
+
+  &:hover {
+    border-color: var(--border-primary);
+  }
+}
+
+// 按鈕樣式
+.btn-primary {
+  background: var(--primary-500);
+  color: #fff; // 主按鈕文字通常是白色
+  border-color: var(--primary-500);
+
+  &:hover:not(:disabled) {
+    background: var(--primary-600);
+    border-color: var(--primary-600);
+  }
+}
+
+// 表單輸入框
+.form-input {
+  width: 100%;
+  padding: @spacing-2 @spacing-3;
+  border: 1px solid var(--border-primary);
+  border-radius: @radius-md;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color @transition-normal ease, box-shadow @transition-normal ease;
+
+  &:focus, &:focus-visible {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 2px var(--primary-100);
+  }
+
+  &:disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+  }
+}
+
+// ----------------------------------------------------
+// 修復瀏覽器自動填入 (Autofill) 在深色模式下的樣式問題
+// ----------------------------------------------------
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text-primary) !important;
+  // 使用 box-shadow 技巧覆蓋瀏覽器強制設定的背景色
+  box-shadow: 0 0 0px 1000px var(--bg-primary) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: var(--text-primary);
+}

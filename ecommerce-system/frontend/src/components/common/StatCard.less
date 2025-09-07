@@ -1,0 +1,124 @@
+@import "@/styles/variables.less";
+
+// 📊 統計卡片樣式
+
+.stat-card {
+  border-radius: @radius-lg;
+  border: 1px solid @border-secondary;
+  box-shadow: @shadow-sm;
+  transition: all @transition-normal ease;
+  
+  &:hover {
+    box-shadow: @shadow-md;
+    transform: translateY(-2px);
+  }
+  
+  .ant-card-body {
+    padding: @spacing-6;
+  }
+  
+  .stat-card-content {
+    .stat-card-header {
+      margin-bottom: @spacing-3;
+      
+      .stat-title {
+        font-size: @font-size-sm;
+        font-weight: @font-weight-medium;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    }
+    
+    .stat-card-body {
+      margin-bottom: @spacing-4;
+      
+      .ant-statistic {
+        .ant-statistic-content {
+          .ant-statistic-content-value {
+            font-family: @font-family;
+          }
+        }
+      }
+    }
+    
+    .stat-card-footer {
+      .trend-icon {
+        font-size: @font-size-sm;
+        
+        &.trend-up {
+          color: @success-500;
+        }
+        
+        &.trend-down {
+          color: @error-500;
+        }
+      }
+      
+      .trend-text {
+        font-size: @font-size-sm;
+        font-weight: @font-weight-medium;
+        
+        &.trend-up {
+          color: @success-500;
+        }
+        
+        &.trend-down {
+          color: @error-500;
+        }
+      }
+      
+      .trend-label {
+        font-size: @font-size-xs;
+      }
+    }
+  }
+}
+
+// 響應式設計
+@media (max-width: @screen-sm) {
+  .stat-card {
+    .ant-card-body {
+      padding: @spacing-4;
+    }
+    
+    .stat-card-content {
+      .stat-card-body {
+        .ant-statistic {
+          .ant-statistic-content {
+            .ant-statistic-content-value {
+              font-size: 20px !important;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// 載入狀態
+.stat-card {
+  &.ant-card-loading {
+    .ant-card-body {
+      padding: @spacing-6;
+    }
+  }
+}
+
+// 不同類型的統計卡片
+.stat-card {
+  &.primary {
+    border-left: 4px solid @primary-500;
+  }
+  
+  &.success {
+    border-left: 4px solid @success-500;
+  }
+  
+  &.warning {
+    border-left: 4px solid @warning-500;
+  }
+  
+  &.error {
+    border-left: 4px solid @error-500;
+  }
+}
