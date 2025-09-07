@@ -170,3 +170,34 @@ cache/
 # Temporary files
 *.tmp
 *.temp
+
+# Project specific
+.env
+*.log
+logs/
+backups/
+*.zip
+
+# Service specific logs
+ecommerce-system/logs/
+ecommerce-system/backend/services/*/logs/
+ecommerce-system/backend/services/*/*.log
+
+# AI Search Service specific
+ecommerce-system/backend/services/ai-search-service/logs/
+ecommerce-system/backend/services/ai-search-service/models/
+
+# Utility Service backups
+ecommerce-system/backend/services/utility-service/backups/
+
+# Frontend build
+ecommerce-system/frontend/dist/
+ecommerce-system/frontend/build/
+ecommerce-system/frontend/node_modules/
+
+# Backend node_modules
+ecommerce-system/backend/services/*/node_modules/
+
+# Python cache
+ecommerce-system/backend/services/ai-search-service/src/__pycache__/
+ecommerce-system/backend/services/ai-search-service/src/*/__pycache__/
