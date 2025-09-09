@@ -1,27 +1,16 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
-// API 基礎配置
+// API 基礎配置 - 統一通過 Nginx 代理
 const API_BASE_URL = 'http://localhost';
 const API_TIMEOUT = 10000;
 
-// 服務端口配置
-const SERVICE_PORTS = {
-  PRODUCT: 3001,        // ✅ 正確
-  USER: 3002,           // ✅ 正確
-  ORDER: 3003,          // ✅ 正確
-  AUTH: 3005,           // ✅ 修正：原3001→3005
-  ANALYTICS: 3006,      // ✅ 正確
-  SETTINGS: 3007,       // ✅ 正確
-  MINIO: 3008,          // ✅ 正確
-  PAYMENT: 3009,        // ✅ 正確
-  LOGISTICS: 3010,      // ✅ 正確
-  DASHBOARD: 3011,      // ✅ 正確
-  INVENTORY: 3012,      // ✅ 正確
-  PERMISSION: 3013,     // ✅ 正確
-  AI_SEARCH: 3014,      // ✅ 修正：原3015→3014
-  LOG: 3018,            // ✅ 正確
-  NOTIFICATION: 3017,   // ✅ 正確
-  UTILITY: 3019,        // ✅ 正確
+// 新的統一 API 路徑配置
+const API_PATHS = {
+  AUTH: '/api/v1/auth',
+  PRODUCTS: '/api/v1/products',
+  ORDERS: '/api/v1/orders',
+  AI: '/api/v1/ai',
+  SYSTEM: '/api/v1/system',
 } as const;
 
 // 創建 API 實例
@@ -77,23 +66,27 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
   return instance;
 };
 
-// 各服務 API 實例
-export const productApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.PRODUCT}/api/v1`);
-export const userApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.USER}/api/v1`);
-export const orderApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.ORDER}/api/v1`);
-export const authApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.AUTH}/api/v1`);
-export const analyticsApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.ANALYTICS}/api/v1`);
-export const settingsApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.SETTINGS}/api/v1`);
-export const minioApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.MINIO}/api/v1`);
-export const paymentApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.PAYMENT}/api/v1`);
-export const logisticsApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.LOGISTICS}/api/v1/logistics`);
-export const inventoryApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.INVENTORY}/api/v1`);
-export const permissionApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.PERMISSION}/api/v1`);
-export const aiSearchApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.AI_SEARCH}/api/v1`);
-export const logApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.LOG}/api/v1`);
-export const notificationApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.NOTIFICATION}/api/v1`);
-export const utilityApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.UTILITY}/api/v1`);
-export const dashboardApi = createApiInstance(`${API_BASE_URL}:${SERVICE_PORTS.DASHBOARD}/api/v1`);
+// 各服務 API 實例 - 統一通過 Nginx 代理
+export const authApi = createApiInstance(`${API_BASE_URL}${API_PATHS.AUTH}`);
+export const productApi = createApiInstance(`${API_BASE_URL}${API_PATHS.PRODUCTS}`);
+export const orderApi = createApiInstance(`${API_BASE_URL}${API_PATHS.ORDERS}`);
+export const aiApi = createApiInstance(`${API_BASE_URL}${API_PATHS.AI}`);
+export const systemApi = createApiInstance(`${API_BASE_URL}${API_PATHS.SYSTEM}`);
+
+// 向後兼容的別名 (逐步遷移)
+export const userApi = authApi;           // 用戶管理併入 AUTH-SERVICE
+export const permissionApi = authApi;     // 權限管理併入 AUTH-SERVICE
+export const analyticsApi = aiApi;        // 分析功能併入 AI-SERVICE
+export const settingsApi = systemApi;     // 系統設定併入 SYSTEM-SERVICE
+export const minioApi = productApi;       // 檔案管理併入 PRODUCT-SERVICE
+export const paymentApi = orderApi;       // 支付功能併入 ORDER-SERVICE
+export const logisticsApi = orderApi;     // 物流功能併入 ORDER-SERVICE
+export const inventoryApi = productApi;   // 庫存管理併入 PRODUCT-SERVICE
+export const aiSearchApi = aiApi;         // AI 搜尋併入 AI-SERVICE
+export const logApi = systemApi;          // 日誌管理併入 SYSTEM-SERVICE
+export const notificationApi = systemApi; // 通知管理併入 SYSTEM-SERVICE
+export const utilityApi = systemApi;      // 工具功能併入 SYSTEM-SERVICE
+export const dashboardApi = systemApi;    // 儀表板併入 SYSTEM-SERVICE
 
 // 通用 API 響應類型
 export interface ApiResponse<T = any> {

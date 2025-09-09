@@ -23,68 +23,8 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
-    proxy: {
-      '/api/v1/products': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/products/, '/api/v1/products'),
-      },
-      '/api/v1/users': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/users/, '/api/v1/users'),
-      },
-      '/api/v1/orders': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/orders/, '/api/v1/orders'),
-      },
-      '/api/v1/auth': {
-        target: 'http://localhost:3005',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/auth/, '/api/v1/auth'),
-      },
-      '/api/v1/analytics': {
-        target: 'http://localhost:3006',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/analytics/, '/api/v1/analytics'),
-      },
-      '/api/v1/settings': {
-        target: 'http://localhost:3007',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/settings/, '/api/v1/settings'),
-      },
-      '/api/v1/minio': {
-        target: 'http://localhost:3008',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/minio/, '/api/v1/minio'),
-      },
-      '/api/v1/payments': {
-        target: 'http://localhost:3009',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/payments/, '/api/v1/payments'),
-      },
-      '/api/v1/logistics': {
-        target: 'http://localhost:3010',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/logistics/, '/api/v1/logistics'),
-      },
-      '/api/v1/dashboard': {
-        target: 'http://localhost:3011',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/dashboard/, '/api/v1/dashboard'),
-      },
-      '/api/v1/inventory': {
-        target: 'http://localhost:3012',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/inventory/, '/api/v1/inventory'),
-      },
-      '/api/v1/permissions': {
-        target: 'http://localhost:3013',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1\/permissions/, '/api/v1/permissions'),
-      },
-    },
+    // 移除 proxy 配置，改由 Nginx 處理 API 代理
+    // 所有 API 請求將直接發送到 Nginx (localhost:80)
   },
   build: {
     outDir: 'dist',
