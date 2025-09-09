@@ -117,7 +117,7 @@ router.get('/', authenticateToken, fileController.getFiles);
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/upload', uploadLimiter, authenticateToken, authorize(['admin', 'manager']), upload.single('file'), fileController.uploadFile);
+router.post('/upload', uploadLimiter, authenticateToken, authorize(['ADMIN', 'MANAGER']), upload.single('file'), fileController.uploadFile);
 
 /**
  * @swagger
@@ -164,7 +164,7 @@ router.post('/upload', uploadLimiter, authenticateToken, authorize(['admin', 'ma
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/batch', uploadLimiter, authenticateToken, authorize(['admin', 'manager']), upload.array('images', 10), fileController.uploadMultiple);
+router.post('/batch', uploadLimiter, authenticateToken, authorize(['ADMIN', 'MANAGER']), upload.array('images', 10), fileController.uploadMultiple);
 
 /**
  * @swagger
@@ -218,7 +218,7 @@ router.get('/:fileId', authenticateToken, fileController.getFileById);
  *       500:
  *         description: 服務器錯誤
  */
-router.delete('/:fileId', authenticateToken, authorize(['admin', 'manager']), fileController.deleteFile);
+router.delete('/:fileId', authenticateToken, authorize(['ADMIN', 'MANAGER']), fileController.deleteFile);
 
 /**
  * @swagger

@@ -156,7 +156,7 @@ router.get('/:logisticsId', authenticateToken, logisticsController.getLogisticsB
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/', authenticateToken, authorize(['admin', 'manager']), validateLogistics.create, logisticsController.createLogistics);
+router.post('/', authenticateToken, authorize(['ADMIN', 'MANAGER']), validateLogistics.create, logisticsController.createLogistics);
 
 /**
  * @swagger
@@ -201,7 +201,7 @@ router.post('/', authenticateToken, authorize(['admin', 'manager']), validateLog
  *       500:
  *         description: 服務器錯誤
  */
-router.put('/:logisticsId/status', authenticateToken, authorize(['admin', 'manager']), logisticsController.updateLogisticsStatus);
+router.put('/:logisticsId/status', authenticateToken, authorize(['ADMIN', 'MANAGER']), logisticsController.updateLogisticsStatus);
 
 /**
  * @swagger
@@ -259,6 +259,21 @@ router.get('/track/:trackingNumber', authenticateToken, logisticsController.trac
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/statistics', authenticateToken, authorize(['admin', 'manager']), logisticsController.getLogisticsStatistics);
+router.get('/statistics', authenticateToken, authorize(['ADMIN', 'MANAGER']), logisticsController.getLogisticsStatistics);
+
+// 創建配送
+router.post('/shipments', authenticateToken, authorize(['ADMIN', 'MANAGER']), logisticsController.createShipment);
+
+// 更新配送狀態
+router.put('/shipments/:id/status', authenticateToken, authorize(['ADMIN', 'MANAGER']), logisticsController.updateShipmentStatus);
+
+// 追蹤配送
+router.get('/track/:trackingNumber', logisticsController.trackShipment);
+
+// 取消配送
+router.put('/shipments/:id/cancel', authenticateToken, authorize(['ADMIN', 'MANAGER']), logisticsController.cancelShipment);
+
+// 計算配送費用
+router.post('/calculate-cost', logisticsController.calculateShippingCost);
 
 module.exports = router;

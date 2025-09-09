@@ -229,7 +229,7 @@ router.post('/:paymentId/process', authenticateToken, paymentController.processP
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/:paymentId/refund', authenticateToken, authorize(['admin', 'manager']), paymentController.processRefund);
+router.post('/:paymentId/refund', authenticateToken, authorize(['ADMIN', 'MANAGER']), paymentController.processRefund);
 
 /**
  * @swagger
@@ -260,6 +260,6 @@ router.post('/:paymentId/refund', authenticateToken, authorize(['admin', 'manage
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/statistics', authenticateToken, authorize(['admin', 'manager']), paymentController.getPaymentStatistics);
+router.get('/statistics', authenticateToken, authorize(['ADMIN', 'MANAGER']), paymentController.getPaymentStatistics);
 
 module.exports = router;

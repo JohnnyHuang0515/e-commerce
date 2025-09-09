@@ -42,8 +42,8 @@ const validateAuth = {
       .withMessage('姓名長度必須在2-50個字符之間'),
     body('role')
       .optional()
-      .isIn(['admin', 'manager', 'user'])
-      .withMessage('角色必須是 admin、manager 或 user'),
+      .isIn(['ADMIN', 'MANAGER', 'MERCHANT', 'STAFF', 'CUSTOMER', 'GUEST'])
+      .withMessage('角色必須是 ADMIN、MANAGER、MERCHANT、STAFF、CUSTOMER 或 GUEST'),
     handleValidationErrors
   ]
 };
@@ -66,8 +66,8 @@ const validateUser = {
       .withMessage('姓名長度必須在2-50個字符之間'),
     body('role')
       .optional()
-      .isIn(['admin', 'manager', 'user'])
-      .withMessage('角色必須是 admin、manager 或 user'),
+      .isIn(['ADMIN', 'MANAGER', 'MERCHANT', 'STAFF', 'CUSTOMER', 'GUEST'])
+      .withMessage('角色必須是 ADMIN、MANAGER、MERCHANT、STAFF、CUSTOMER 或 GUEST'),
     body('status')
       .optional()
       .isIn(['active', 'inactive', 'suspended'])
@@ -88,8 +88,8 @@ const validateUser = {
       .normalizeEmail(),
     body('role')
       .optional()
-      .isIn(['admin', 'manager', 'user'])
-      .withMessage('角色必須是 admin、manager 或 user'),
+      .isIn(['ADMIN', 'MANAGER', 'MERCHANT', 'STAFF', 'CUSTOMER', 'GUEST'])
+      .withMessage('角色必須是 ADMIN、MANAGER、MERCHANT、STAFF、CUSTOMER 或 GUEST'),
     body('status')
       .optional()
       .isIn(['active', 'inactive', 'suspended'])

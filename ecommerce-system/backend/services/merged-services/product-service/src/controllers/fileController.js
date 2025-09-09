@@ -44,12 +44,14 @@ const getFiles = async (req, res) => {
       whereClause.category = category;
     }
 
-    const files = await File.find(whereClause)
-      .skip(offset)
-      .limit(parseInt(limit))
-      .sort({ created_at: -1 });
+    const { count, rows: files } = await File.findAndCountAll({
+      where: whereClause,
+      limit: parseInt(limit),
+      offset: offset,
+      order: [['created_at', 'DESC']]
+    });
 
-    const total = await File.countDocuments(whereClause);
+    const total = count;
 
     res.json({
       success: true,

@@ -264,6 +264,139 @@ const getInventoryStatistics = async (req, res) => {
   }
 };
 
+// 庫存調整
+const adjustStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newQuantity, reason, createdBy } = req.body;
+
+    if (newQuantity === undefined || newQuantity < 0) {
+      return res.status(400).json({
+        success: false,
+        message: '無效的庫存數量',
+      });
+    }
+
+    const inventory = await Inventory.findByPk(id);
+    if (!inventory) {
+      return res.status(404).json({
+        success: false,
+        message: '庫存記錄不存在',
+      });
+    }
+
+    const oldQuantity = inventory.quantity;
+    await inventory.update({ quantity: newQuantity });
+
+    res.json({
+      success: true,
+      message: '庫存調整成功',
+      data: {
+        inventory,
+        adjustment: {
+          oldQuantity,
+          newQuantity,
+          difference: newQuantity - oldQuantity
+        }
+      },
+    });
+  } catch (error) {
+    console.error('調整庫存失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 預留庫存
+const reserveStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantity, orderId, createdBy } = req.body;
+
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '無效的預留數量',
+      });
+    }
+
+    const inventory = await Inventory.findByPk(id);
+    if (!inventory) {
+      return res.status(404).json({
+        success: false,
+        message: '庫存記錄不存在',
+      });
+    }
+
+    if (inventory.quantity < quantity) {
+      return res.status(400).json({
+        success: false,
+        message: '庫存不足',
+      });
+    }
+
+    const newReserved = (inventory.reserved_quantity || 0) + quantity;
+    const newAvailable = inventory.quantity - newReserved;
+
+    await inventory.update({
+      reserved_quantity: newReserved,
+      available_quantity: newAvailable
+    });
+
+    res.json({
+      success: true,
+      message: '庫存預留成功',
+      data: {
+        inventory,
+        reserved: quantity,
+        available: newAvailable
+      },
+    });
+  } catch (error) {
+    console.error('預留庫存失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 獲取低庫存警告
+const getLowStockAlerts = async (req, res) => {
+  try {
+    const { threshold = 10 } = req.query;
+
+    const lowStockItems = await Inventory.findAll({
+      where: {
+        quantity: {
+          [Op.lte]: parseInt(threshold)
+        }
+      },
+      order: [['quantity', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: {
+        alerts: lowStockItems,
+        count: lowStockItems.length,
+        threshold: parseInt(threshold)
+      }
+    });
+  } catch (error) {
+    console.error('獲取低庫存警告失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getInventory,
   getInventoryById,
@@ -271,5 +404,8 @@ module.exports = {
   updateInventory,
   adjustInventory,
   getLowStockItems,
-  getInventoryStatistics
+  getInventoryStatistics,
+  adjustStock,
+  reserveStock,
+  getLowStockAlerts
 };

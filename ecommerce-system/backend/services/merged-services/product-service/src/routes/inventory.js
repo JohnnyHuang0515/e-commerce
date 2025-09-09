@@ -146,7 +146,7 @@ router.get('/:inventoryId', authenticateToken, inventoryController.getInventoryB
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/', authenticateToken, authorize(['admin', 'manager']), validateInventory.create, inventoryController.createInventory);
+router.post('/', authenticateToken, authorize(['ADMIN', 'MANAGER']), validateInventory.create, inventoryController.createInventory);
 
 /**
  * @swagger
@@ -190,7 +190,7 @@ router.post('/', authenticateToken, authorize(['admin', 'manager']), validateInv
  *       500:
  *         description: 服務器錯誤
  */
-router.put('/:inventoryId', authenticateToken, authorize(['admin', 'manager']), validateInventory.update, inventoryController.updateInventory);
+router.put('/:inventoryId', authenticateToken, authorize(['ADMIN', 'MANAGER']), validateInventory.update, inventoryController.updateInventory);
 
 /**
  * @swagger
@@ -235,7 +235,7 @@ router.put('/:inventoryId', authenticateToken, authorize(['admin', 'manager']), 
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/:inventoryId/adjust', authenticateToken, authorize(['admin', 'manager']), inventoryController.adjustInventory);
+router.post('/:inventoryId/adjust', authenticateToken, authorize(['ADMIN', 'MANAGER']), inventoryController.adjustInventory);
 
 /**
  * @swagger
@@ -279,5 +279,120 @@ router.get('/low-stock', authenticateToken, inventoryController.getLowStockItems
  *         description: 服務器錯誤
  */
 router.get('/statistics', authenticateToken, inventoryController.getInventoryStatistics);
+
+/**
+ * @swagger
+ * /api/v1/inventory/{id}/adjust:
+ *   put:
+ *     summary: 調整庫存
+ *     tags: [庫存管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 庫存ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newQuantity
+ *             properties:
+ *               newQuantity:
+ *                 type: integer
+ *                 description: 新的庫存數量
+ *               reason:
+ *                 type: string
+ *                 description: 調整原因
+ *               createdBy:
+ *                 type: string
+ *                 description: 操作人員
+ *     responses:
+ *       200:
+ *         description: 調整成功
+ *       400:
+ *         description: 無效的庫存數量
+ *       404:
+ *         description: 庫存記錄不存在
+ *       500:
+ *         description: 服務器錯誤
+ */
+router.put('/:id/adjust', authenticateToken, authorize(['ADMIN', 'MANAGER']), inventoryController.adjustStock);
+
+/**
+ * @swagger
+ * /api/v1/inventory/{id}/reserve:
+ *   post:
+ *     summary: 預留庫存
+ *     tags: [庫存管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 庫存ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 description: 預留數量
+ *               orderId:
+ *                 type: string
+ *                 description: 訂單ID
+ *               createdBy:
+ *                 type: string
+ *                 description: 操作人員
+ *     responses:
+ *       200:
+ *         description: 預留成功
+ *       400:
+ *         description: 無效的預留數量或庫存不足
+ *       404:
+ *         description: 庫存記錄不存在
+ *       500:
+ *         description: 服務器錯誤
+ */
+router.post('/:id/reserve', authenticateToken, authorize(['ADMIN', 'MANAGER']), inventoryController.reserveStock);
+
+/**
+ * @swagger
+ * /api/v1/inventory/alerts:
+ *   get:
+ *     summary: 獲取低庫存警告
+ *     tags: [庫存管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: threshold
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: 低庫存閾值
+ *     responses:
+ *       200:
+ *         description: 獲取成功
+ *       401:
+ *         description: 未授權
+ *       500:
+ *         description: 服務器錯誤
+ */
+router.get('/alerts', authenticateToken, inventoryController.getLowStockAlerts);
 
 module.exports = router;

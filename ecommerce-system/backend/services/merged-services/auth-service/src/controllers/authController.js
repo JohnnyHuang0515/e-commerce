@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const { User, Role, Permission } = require('../models');
 
 // 用戶登入
@@ -102,12 +103,23 @@ const register = async (req, res) => {
     // 加密密碼
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // 根據角色名稱找到對應的 role_id
+    const roleRecord = await Role.findOne({ where: { name: role } });
+    if (!roleRecord) {
+      return res.status(400).json({
+        success: false,
+        message: '無效的角色'
+      });
+    }
+
     // 創建用戶
     const user = await User.create({
+      id: uuidv4(),
       email,
       password: hashedPassword,
       name,
       role: role,
+      role_id: roleRecord.id,
       status: 'active'
     });
 
@@ -144,7 +156,8 @@ const register = async (req, res) => {
     console.error('註冊錯誤:', error);
     res.status(500).json({
       success: false,
-      message: '註冊過程中發生錯誤'
+      message: '註冊過程中發生錯誤',
+      error: error.message
     });
   }
 };

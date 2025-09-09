@@ -171,7 +171,7 @@ router.get('/files/:fileId', authenticateToken, utilityController.downloadFile);
  *       500:
  *         description: 服務器錯誤
  */
-router.delete('/files/:fileId', authenticateToken, authorize(['admin', 'manager']), utilityController.deleteFile);
+router.delete('/files/:fileId', authenticateToken, authorize(['ADMIN', 'MANAGER']), utilityController.deleteFile);
 
 /**
  * @swagger
@@ -238,7 +238,7 @@ router.post('/backup', authenticateToken, authorize(['admin']), utilityControlle
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/backup', authenticateToken, authorize(['admin', 'manager']), utilityController.getBackups);
+router.get('/backup', authenticateToken, authorize(['ADMIN', 'MANAGER']), utilityController.getBackups);
 
 /**
  * @swagger
@@ -312,7 +312,7 @@ router.post('/backup/:backupId/restore', authenticateToken, authorize(['admin'])
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/export', authenticateToken, authorize(['admin', 'manager']), utilityController.exportData);
+router.post('/export', authenticateToken, authorize(['ADMIN', 'MANAGER']), utilityController.exportData);
 
 /**
  * @swagger

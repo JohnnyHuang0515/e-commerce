@@ -200,7 +200,7 @@ router.post('/', authenticateToken, validateOrder.create, orderController.create
  *       500:
  *         description: 服務器錯誤
  */
-router.put('/:orderId/status', authenticateToken, authorize(['admin', 'manager']), orderController.updateOrderStatus);
+router.put('/:orderId/status', authenticateToken, authorize(['ADMIN', 'MANAGER']), orderController.updateOrderStatus);
 
 /**
  * @swagger
@@ -283,7 +283,7 @@ router.post('/:orderId/cancel', authenticateToken, orderController.cancelOrder);
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/:orderId/refund', authenticateToken, authorize(['admin', 'manager']), orderController.processRefund);
+router.post('/:orderId/refund', authenticateToken, authorize(['ADMIN', 'MANAGER']), orderController.processRefund);
 
 /**
  * @swagger
@@ -314,7 +314,7 @@ router.post('/:orderId/refund', authenticateToken, authorize(['admin', 'manager'
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/statistics', authenticateToken, authorize(['admin', 'manager']), orderController.getOrderStatistics);
+router.get('/statistics', authenticateToken, authorize(['ADMIN', 'MANAGER']), orderController.getOrderStatistics);
 
 /**
  * @swagger
@@ -332,6 +332,6 @@ router.get('/statistics', authenticateToken, authorize(['admin', 'manager']), or
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/overview', authenticateToken, authorize(['admin', 'manager']), orderController.getOrderOverview);
+router.get('/overview', authenticateToken, authorize(['ADMIN', 'MANAGER']), orderController.getOrderOverview);
 
 module.exports = router;

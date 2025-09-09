@@ -104,7 +104,7 @@ const checkPermission = (resource, action) => {
       }
 
       // 管理員擁有所有權限
-      if (req.user.role === 'admin') {
+      if (req.user.role === 'ADMIN') {
         return next();
       }
 

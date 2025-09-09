@@ -207,7 +207,7 @@ router.get('/insights', authenticateToken, analyticsController.getInsights);
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/reports', authenticateToken, authorize(['admin', 'manager']), analyticsController.getReports);
+router.get('/reports', authenticateToken, authorize(['ADMIN', 'MANAGER']), analyticsController.getReports);
 
 /**
  * @swagger
@@ -249,7 +249,7 @@ router.get('/reports', authenticateToken, authorize(['admin', 'manager']), analy
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/reports', authenticateToken, authorize(['admin', 'manager']), analyticsController.generateReport);
+router.post('/reports', authenticateToken, authorize(['ADMIN', 'MANAGER']), analyticsController.generateReport);
 
 /**
  * @swagger
@@ -276,6 +276,6 @@ router.post('/reports', authenticateToken, authorize(['admin', 'manager']), anal
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/reports/:reportId', authenticateToken, authorize(['admin', 'manager']), analyticsController.getReportById);
+router.get('/reports/:reportId', authenticateToken, authorize(['ADMIN', 'MANAGER']), analyticsController.getReportById);
 
 module.exports = router;

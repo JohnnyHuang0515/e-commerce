@@ -101,7 +101,7 @@ const router = express.Router();
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/', authenticateToken, authorize(['admin', 'manager']), userController.getUsers);
+router.get('/', authenticateToken, authorize(['ADMIN', 'MANAGER']), userController.getUsers);
 
 /**
  * @swagger
@@ -119,7 +119,7 @@ router.get('/', authenticateToken, authorize(['admin', 'manager']), userControll
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/overview', authenticateToken, authorize(['admin', 'manager']), userController.getUserOverview);
+router.get('/overview', authenticateToken, authorize(['ADMIN', 'MANAGER']), userController.getUserOverview);
 
 /**
  * @swagger
@@ -293,7 +293,7 @@ router.delete('/:userId', authenticateToken, authorize(['admin']), userControlle
  *             properties:
  *               role:
  *                 type: string
- *                 enum: [admin, manager, user]
+ *                 enum: [ADMIN, MANAGER, CUSTOMER]
  *     responses:
  *       200:
  *         description: 更新成功

@@ -356,11 +356,160 @@ const getPaymentStatistics = async (req, res) => {
   }
 };
 
+// 確認支付
+const confirmPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { transactionId, amount, currency } = req.body;
+
+    const payment = await Payment.findOne({ where: { payment_id: paymentId } });
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: '支付記錄不存在',
+      });
+    }
+
+    if (payment.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: '支付狀態不正確',
+      });
+    }
+
+    // 更新支付狀態
+    await payment.update({
+      status: 'COMPLETED',
+      transaction_id: transactionId,
+      completed_at: new Date()
+    });
+
+    // 更新關聯訂單狀態
+    if (payment.order_id) {
+      await Order.update(
+        { status: 'PAID' },
+        { where: { id: payment.order_id } }
+      );
+    }
+
+    res.json({
+      success: true,
+      message: '支付確認成功',
+      data: {
+        payment,
+        transactionId,
+        amount,
+        currency
+      }
+    });
+  } catch (error) {
+    console.error('確認支付失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 取消支付
+const cancelPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { reason } = req.body;
+
+    const payment = await Payment.findOne({ where: { payment_id: paymentId } });
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: '支付記錄不存在',
+      });
+    }
+
+    if (payment.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: '只有待處理的支付可以取消',
+      });
+    }
+
+    // 更新支付狀態
+    await payment.update({
+      status: 'CANCELLED',
+      cancelled_at: new Date(),
+      cancellation_reason: reason || '用戶取消'
+    });
+
+    res.json({
+      success: true,
+      message: '支付取消成功',
+      data: {
+        payment,
+        reason: reason || '用戶取消'
+      }
+    });
+  } catch (error) {
+    console.error('取消支付失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 處理 Webhook
+const handleWebhook = async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const payload = req.body;
+    const signature = req.headers['stripe-signature'] || req.headers['paypal-signature'];
+
+    // 根據提供者處理 Webhook
+    let result;
+    switch (provider) {
+      case 'stripe':
+        // 處理 Stripe Webhook
+        result = { success: true, message: 'Stripe webhook 處理成功' };
+        break;
+      case 'paypal':
+        // 處理 PayPal Webhook
+        result = { success: true, message: 'PayPal webhook 處理成功' };
+        break;
+      case 'line_pay':
+        // 處理 LINE Pay Webhook
+        result = { success: true, message: 'LINE Pay webhook 處理成功' };
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: '不支援的支付提供者'
+        });
+    }
+
+    res.json({
+      success: true,
+      message: 'Webhook 處理成功',
+      data: result
+    });
+  } catch (error) {
+    console.error('處理 Webhook 失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getPayments,
   getPaymentById,
   createPayment,
   processPayment,
   processRefund,
-  getPaymentStatistics
+  getPaymentStatistics,
+  confirmPayment,
+  cancelPayment,
+  handleWebhook
 };

@@ -8,7 +8,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 require('dotenv').config();
 
 // 資料庫連接
-const { sequelize, testConnection, syncDatabase } = require('./config/database');
+const { sequelize, testConnection } = require('./config/database');
 
 // 路由
 const orderRoutes = require('./routes/order');
@@ -133,11 +133,6 @@ const initializeDatabase = async () => {
     
     // PostgreSQL 初始化
     const postgresConnected = await testConnection();
-    if (postgresConnected) {
-      if (process.env.NODE_ENV === 'development') {
-        await syncDatabase(false);
-      }
-    }
     
     console.log('✅ 資料庫初始化完成');
     console.log(`   - PostgreSQL: ${postgresConnected ? '已連接' : '連接失敗'}`);

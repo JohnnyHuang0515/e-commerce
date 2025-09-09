@@ -357,11 +357,286 @@ const getLogisticsStatistics = async (req, res) => {
   }
 };
 
+// 創建配送
+const createShipment = async (req, res) => {
+  try {
+    const { orderId, shippingMethod, trackingNumber, carrier } = req.body;
+
+    if (!orderId || !shippingMethod) {
+      return res.status(400).json({
+        success: false,
+        message: '訂單ID和配送方式是必填項',
+      });
+    }
+
+    // 檢查訂單是否存在
+    const order = await Order.findByPk(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: '訂單不存在',
+      });
+    }
+
+    // 創建配送記錄
+    const logistics = await Logistics.create({
+      order_id: orderId,
+      tracking_number: trackingNumber || `TRK${Date.now()}`,
+      carrier: carrier || 'default',
+      shipping_method: shippingMethod,
+      status: 'PENDING',
+      created_at: new Date()
+    });
+
+    // 更新訂單狀態
+    await order.update({ status: 'SHIPPED' });
+
+    res.json({
+      success: true,
+      message: '配送創建成功',
+      data: {
+        logistics,
+        orderId,
+        trackingNumber: logistics.tracking_number
+      }
+    });
+  } catch (error) {
+    console.error('創建配送失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 更新配送狀態
+const updateShipmentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, location, notes } = req.body;
+
+    const logistics = await Logistics.findByPk(id);
+    if (!logistics) {
+      return res.status(404).json({
+        success: false,
+        message: '配送記錄不存在',
+      });
+    }
+
+    // 更新配送狀態
+    await logistics.update({
+      status,
+      current_location: location,
+      notes,
+      updated_at: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: '配送狀態更新成功',
+      data: {
+        logistics,
+        status,
+        location,
+        notes
+      }
+    });
+  } catch (error) {
+    console.error('更新配送狀態失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 追蹤配送
+const trackShipment = async (req, res) => {
+  try {
+    const { trackingNumber } = req.params;
+
+    const logistics = await Logistics.findOne({
+      where: { tracking_number: trackingNumber },
+      include: [{
+        model: Order,
+        as: 'order',
+        attributes: ['id', 'order_number', 'status']
+      }]
+    });
+
+    if (!logistics) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到配送記錄',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        trackingNumber,
+        status: logistics.status,
+        currentLocation: logistics.current_location,
+        estimatedDelivery: logistics.estimated_delivery,
+        carrier: logistics.carrier,
+        order: logistics.order,
+        timeline: [
+          {
+            status: 'PENDING',
+            timestamp: logistics.created_at,
+            location: '倉庫'
+          },
+          {
+            status: logistics.status,
+            timestamp: logistics.updated_at,
+            location: logistics.current_location || '配送中'
+          }
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('追蹤配送失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 取消配送
+const cancelShipment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const logistics = await Logistics.findByPk(id);
+    if (!logistics) {
+      return res.status(404).json({
+        success: false,
+        message: '配送記錄不存在',
+      });
+    }
+
+    if (logistics.status === 'DELIVERED') {
+      return res.status(400).json({
+        success: false,
+        message: '已配送的訂單無法取消',
+      });
+    }
+
+    // 更新配送狀態
+    await logistics.update({
+      status: 'CANCELLED',
+      cancellation_reason: reason || '用戶取消',
+      cancelled_at: new Date()
+    });
+
+    // 更新訂單狀態
+    await Order.update(
+      { status: 'CANCELLED' },
+      { where: { id: logistics.order_id } }
+    );
+
+    res.json({
+      success: true,
+      message: '配送取消成功',
+      data: {
+        logistics,
+        reason: reason || '用戶取消'
+      }
+    });
+  } catch (error) {
+    console.error('取消配送失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
+// 計算配送費用
+const calculateShippingCost = async (req, res) => {
+  try {
+    const { weight, distance, shippingMethod, carrier } = req.body;
+
+    if (!weight || !distance || !shippingMethod) {
+      return res.status(400).json({
+        success: false,
+        message: '重量、距離和配送方式是必填項',
+      });
+    }
+
+    // 基本配送費用計算
+    let baseCost = 0;
+    switch (shippingMethod) {
+      case 'standard':
+        baseCost = 100 + (weight * 10) + (distance * 2);
+        break;
+      case 'express':
+        baseCost = 200 + (weight * 15) + (distance * 3);
+        break;
+      case 'overnight':
+        baseCost = 300 + (weight * 20) + (distance * 5);
+        break;
+      default:
+        baseCost = 100 + (weight * 10) + (distance * 2);
+    }
+
+    // 根據配送商調整費用
+    let carrierMultiplier = 1;
+    switch (carrier) {
+      case 'black_cat':
+        carrierMultiplier = 1.2;
+        break;
+      case 'post_office':
+        carrierMultiplier = 0.8;
+        break;
+      case 'convenience_store':
+        carrierMultiplier = 1.0;
+        break;
+      default:
+        carrierMultiplier = 1.0;
+    }
+
+    const finalCost = Math.round(baseCost * carrierMultiplier);
+
+    res.json({
+      success: true,
+      data: {
+        weight,
+        distance,
+        shippingMethod,
+        carrier,
+        baseCost,
+        carrierMultiplier,
+        finalCost,
+        currency: 'TWD'
+      }
+    });
+  } catch (error) {
+    console.error('計算配送費用失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '伺服器錯誤',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getLogistics,
   getLogisticsById,
   createLogistics,
   updateLogisticsStatus,
   trackLogistics,
-  getLogisticsStatistics
+  getLogisticsStatistics,
+  createShipment,
+  updateShipmentStatus,
+  trackShipment,
+  cancelShipment,
+  calculateShippingCost
 };

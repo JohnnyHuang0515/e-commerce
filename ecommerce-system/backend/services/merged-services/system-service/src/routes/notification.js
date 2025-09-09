@@ -282,7 +282,7 @@ router.put('/:notificationId', authenticateToken, validateNotification.update, n
  *       500:
  *         description: 服務器錯誤
  */
-router.delete('/:notificationId', authenticateToken, authorize(['admin', 'manager']), notificationController.deleteNotification);
+router.delete('/:notificationId', authenticateToken, authorize(['ADMIN', 'MANAGER']), notificationController.deleteNotification);
 
 /**
  * @swagger
@@ -309,7 +309,7 @@ router.delete('/:notificationId', authenticateToken, authorize(['admin', 'manage
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/:notificationId/send', authenticateToken, authorize(['admin', 'manager']), notificationController.sendNotification);
+router.post('/:notificationId/send', authenticateToken, authorize(['ADMIN', 'MANAGER']), notificationController.sendNotification);
 
 /**
  * @swagger

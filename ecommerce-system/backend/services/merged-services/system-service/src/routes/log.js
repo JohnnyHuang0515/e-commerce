@@ -90,7 +90,7 @@ const router = express.Router();
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/', authenticateToken, authorize(['admin', 'manager']), logController.getLogs);
+router.get('/', authenticateToken, authorize(['ADMIN', 'MANAGER']), logController.getLogs);
 
 /**
  * @swagger
@@ -180,7 +180,7 @@ router.post('/', authenticateToken, logController.createLog);
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/export', authenticateToken, authorize(['admin', 'manager']), logController.exportLogs);
+router.post('/export', authenticateToken, authorize(['ADMIN', 'MANAGER']), logController.exportLogs);
 
 /**
  * @swagger
@@ -218,7 +218,7 @@ router.post('/export', authenticateToken, authorize(['admin', 'manager']), logCo
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/stats', authenticateToken, authorize(['admin', 'manager']), logController.getLogStats);
+router.get('/stats', authenticateToken, authorize(['ADMIN', 'MANAGER']), logController.getLogStats);
 
 /**
  * @swagger
@@ -286,6 +286,6 @@ router.post('/cleanup', authenticateToken, authorize(['admin']), logController.c
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/real-time', authenticateToken, authorize(['admin', 'manager']), logController.getRealTimeLogs);
+router.get('/real-time', authenticateToken, authorize(['ADMIN', 'MANAGER']), logController.getRealTimeLogs);
 
 module.exports = router;

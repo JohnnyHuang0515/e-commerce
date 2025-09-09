@@ -66,7 +66,7 @@ const router = express.Router();
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/configs', authenticateToken, authorize(['admin', 'manager']), systemController.getConfigs);
+router.get('/configs', authenticateToken, authorize(['ADMIN', 'MANAGER']), systemController.getConfigs);
 
 /**
  * @swagger
@@ -137,7 +137,7 @@ router.post('/configs', authenticateToken, authorize(['admin']), validateSystem.
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/configs/:key', authenticateToken, authorize(['admin', 'manager']), systemController.getConfig);
+router.get('/configs/:key', authenticateToken, authorize(['ADMIN', 'MANAGER']), systemController.getConfig);
 
 /**
  * @swagger
@@ -261,7 +261,7 @@ router.get('/info', authenticateToken, systemController.getSystemInfo);
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/dashboard/overview', authenticateToken, authorize(['admin', 'manager']), dashboardController.getOverview);
+router.get('/dashboard/overview', authenticateToken, authorize(['ADMIN', 'MANAGER']), dashboardController.getOverview);
 
 /**
  * @swagger
@@ -279,7 +279,7 @@ router.get('/dashboard/overview', authenticateToken, authorize(['admin', 'manage
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/dashboard/realtime', authenticateToken, authorize(['admin', 'manager']), dashboardController.getRealtime);
+router.get('/dashboard/realtime', authenticateToken, authorize(['ADMIN', 'MANAGER']), dashboardController.getRealtime);
 
 /**
  * @swagger
@@ -304,6 +304,6 @@ router.get('/dashboard/realtime', authenticateToken, authorize(['admin', 'manage
  *       500:
  *         description: 服務器錯誤
  */
-router.get('/dashboard/analytics', authenticateToken, authorize(['admin', 'manager']), dashboardController.getAnalytics);
+router.get('/dashboard/analytics', authenticateToken, authorize(['ADMIN', 'MANAGER']), dashboardController.getAnalytics);
 
 module.exports = router;

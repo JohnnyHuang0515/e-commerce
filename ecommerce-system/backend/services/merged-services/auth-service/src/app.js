@@ -8,7 +8,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 require('dotenv').config();
 
 // 資料庫連接
-const { sequelize, testConnection, syncDatabase } = require('./config/postgres');
+const { sequelize, testConnection } = require('./config/postgres');
 const { connectMongoDB } = require('./config/mongodb');
 
 // 路由
@@ -93,6 +93,9 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/permissions', permissionRoutes);
 
+// 向後兼容路由
+app.use('/api/v1/roles', permissionRoutes);
+
 // 根路由
 app.get('/', (req, res) => {
   res.json({
@@ -136,11 +139,6 @@ const initializeDatabases = async () => {
     
     // PostgreSQL 初始化
     const postgresConnected = await testConnection();
-    if (postgresConnected) {
-      if (process.env.NODE_ENV === 'development') {
-        await syncDatabase(false);
-      }
-    }
     
     // MongoDB 初始化
     const mongoConnected = await connectMongoDB();

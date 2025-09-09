@@ -20,8 +20,9 @@ const router = express.Router();
  *           type: string
  *         price:
  *           type: number
- *         category:
+ *         category_id:
  *           type: string
+ *           format: uuid
  *         status:
  *           type: string
  *         images:
@@ -134,8 +135,9 @@ router.get('/:productId', authenticateToken, productController.getProductById);
  *                 type: string
  *               price:
  *                 type: number
- *               category:
+ *               category_id:
  *                 type: string
+ *                 format: uuid
  *               status:
  *                 type: string
  *                 default: 'active'
@@ -153,7 +155,7 @@ router.get('/:productId', authenticateToken, productController.getProductById);
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/', authenticateToken, authorize(['admin', 'manager']), validateProduct.create, productController.createProduct);
+router.post('/', authenticateToken, authorize(['ADMIN', 'MANAGER']), validateProduct.create, productController.createProduct);
 
 /**
  * @swagger
@@ -183,8 +185,9 @@ router.post('/', authenticateToken, authorize(['admin', 'manager']), validatePro
  *                 type: string
  *               price:
  *                 type: number
- *               category:
+ *               category_id:
  *                 type: string
+ *                 format: uuid
  *               status:
  *                 type: string
  *               images:
@@ -203,7 +206,7 @@ router.post('/', authenticateToken, authorize(['admin', 'manager']), validatePro
  *       500:
  *         description: 服務器錯誤
  */
-router.put('/:productId', authenticateToken, authorize(['admin', 'manager']), validateProduct.update, productController.updateProduct);
+router.put('/:productId', authenticateToken, authorize(['ADMIN', 'MANAGER']), validateProduct.update, productController.updateProduct);
 
 /**
  * @swagger
@@ -230,7 +233,7 @@ router.put('/:productId', authenticateToken, authorize(['admin', 'manager']), va
  *       500:
  *         description: 服務器錯誤
  */
-router.delete('/:productId', authenticateToken, authorize(['admin']), productController.deleteProduct);
+router.delete('/:productId', authenticateToken, authorize(['ADMIN']), productController.deleteProduct);
 
 /**
  * @swagger
@@ -283,6 +286,12 @@ router.get('/categories', authenticateToken, productController.getCategories);
  *       500:
  *         description: 服務器錯誤
  */
-router.post('/categories', authenticateToken, authorize(['admin', 'manager']), productController.createCategory);
+router.post('/categories', authenticateToken, authorize(['ADMIN', 'MANAGER']), productController.createCategory);
+
+// 新增端點
+router.post('/batch', authenticateToken, authorize(['ADMIN', 'MANAGER']), productController.batchOperation);
+router.get('/statistics', authenticateToken, productController.getProductStatistics);
+router.post('/import', authenticateToken, authorize(['ADMIN', 'MANAGER']), productController.importProducts);
+router.get('/export', authenticateToken, productController.exportProducts);
 
 module.exports = router;
