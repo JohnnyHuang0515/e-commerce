@@ -139,6 +139,7 @@ router.get('/', authenticateToken, authorize(['ADMIN', 'MANAGER']), logControlle
  *         description: 服務器錯誤
  */
 router.post('/', authenticateToken, logController.createLog);
+router.post('/batch', authenticateToken, logController.createBatchLogs);
 
 /**
  * @swagger

@@ -1,31 +1,19 @@
-import { logisticsApi } from './api';
+import { logisticsApi, ApiResponse, PaginatedResponse } from './api';
 
 // 物流相關類型定義
 export interface Shipment {
   _id: string;
+  shipmentId: string;
   orderId: string;
   userId: string;
-  trackingNumber: string;
-  status: 'pending' | 'processing' | 'shipped' | 'in_transit' | 'delivered' | 'failed' | 'returned';
-  shippingMethod: 'standard' | 'express' | 'overnight' | 'pickup';
-  provider: 'black_cat' | 'hsinchu' | 'sf_express' | 'post_office' | 'custom';
-  origin: {
+  status: 'pending' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed' | 'returned' | 'cancelled';
+  shippingAddress: {
     name: string;
-    address: string;
+    phone: string;
     city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-    phone?: string;
-  };
-  destination: {
-    name: string;
+    district: string;
     address: string;
-    city: string;
-    state: string;
     zipCode: string;
-    country: string;
-    phone?: string;
   };
   packageInfo: {
     weight: number;
@@ -34,49 +22,42 @@ export interface Shipment {
       width: number;
       height: number;
     };
-    description?: string;
+    value: number;
+    description: string;
   };
-  estimatedDelivery?: string;
-  actualDelivery?: string;
-  cost: number;
-  currency: string;
-  metadata?: Record<string, any>;
+  shippingInfo: {
+    method: string;
+    provider: string;
+    trackingNumber: string;
+    estimatedDelivery?: string;
+    actualDelivery?: string;
+  };
+  costInfo: {
+    totalFee: number;
+    currency: string;
+  };
+  trackingEvents: TrackingEvent[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface TrackingEvent {
-  _id: string;
-  shipmentId: string;
   status: string;
-  location: string;
   description: string;
+  location?: string;
   timestamp: string;
-  metadata?: Record<string, any>;
 }
 
 export interface ShipmentCreateRequest {
   orderId: string;
   userId: string;
-  shippingMethod: string;
-  provider: string;
-  origin: {
+  shippingAddress: {
     name: string;
-    address: string;
+    phone: string;
     city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-    phone?: string;
-  };
-  destination: {
-    name: string;
+    district: string;
     address: string;
-    city: string;
-    state: string;
     zipCode: string;
-    country: string;
-    phone?: string;
   };
   packageInfo: {
     weight: number;
@@ -85,17 +66,27 @@ export interface ShipmentCreateRequest {
       width: number;
       height: number;
     };
-    description?: string;
+    value: number;
+    description: string;
   };
-  metadata?: Record<string, any>;
+  shippingMethod: 'home_delivery' | 'convenience_store' | 'post_office' | 'express';
 }
 
-export interface ShipmentUpdateRequest {
-  status?: string;
-  trackingNumber?: string;
-  estimatedDelivery?: string;
-  actualDelivery?: string;
-  metadata?: Record<string, any>;
+export interface CostCalculationRequest {
+    packageInfo: {
+        weight: number;
+        dimensions: {
+            length: number;
+            width: number;
+            height: number;
+        };
+        value: number;
+    };
+    shippingMethod: string;
+    shippingAddress: {
+        city: string;
+        district: string;
+    };
 }
 
 export interface LogisticsStats {
@@ -104,100 +95,60 @@ export interface LogisticsStats {
   pendingShipments: number;
   failedShipments: number;
   averageDeliveryTime: number;
-  shipmentsByStatus: Record<string, number>;
-  shipmentsByProvider: Record<string, number>;
-  shipmentsByMethod: Record<string, number>;
-  dailyStats: Array<{
-    date: string;
-    count: number;
-    delivered: number;
-  }>;
 }
 
 export interface LogisticsSearchParams {
   page?: number;
   limit?: number;
   status?: string;
-  provider?: string;
-  shippingMethod?: string;
+  method?: string;
   userId?: string;
   orderId?: string;
-  trackingNumber?: string;
-  startDate?: string;
-  endDate?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
 
 // 物流服務類
 export class LogisticsService {
-  // 獲取物流列表
-  static async getShipments(params?: LogisticsSearchParams) {
+  // 獲取配送列表
+  static async getShipments(params?: LogisticsSearchParams): Promise<ApiResponse<PaginatedResponse<Shipment>>> {
     const response = await logisticsApi.get('/shipments', { params });
     return response.data;
   }
 
-  // 獲取物流詳情
-  static async getShipment(shipmentId: string) {
+  // 獲取配送詳情
+  static async getShipment(shipmentId: string): Promise<ApiResponse<Shipment>> {
     const response = await logisticsApi.get(`/shipments/${shipmentId}`);
     return response.data;
   }
 
-  // 創建物流
-  static async createShipment(data: ShipmentCreateRequest) {
+  // 建立配送
+  static async createShipment(data: ShipmentCreateRequest): Promise<ApiResponse<Shipment>> {
     const response = await logisticsApi.post('/shipments', data);
     return response.data;
   }
 
-  // 更新物流
-  static async updateShipment(shipmentId: string, data: ShipmentUpdateRequest) {
-    const response = await logisticsApi.put(`/shipments/${shipmentId}`, data);
+  // 取消配送
+  static async cancelShipment(shipmentId: string, reason: string): Promise<ApiResponse<any>> {
+      const response = await logisticsApi.post(`/shipments/${shipmentId}/cancel`, { reason });
+      return response.data;
+  }
+
+  // 追蹤配送
+  static async trackShipment(shipmentId: string): Promise<ApiResponse<TrackingEvent[]>> {
+    const response = await logisticsApi.get(`/shipments/${shipmentId}/track`);
     return response.data;
   }
 
-  // 刪除物流
-  static async deleteShipment(shipmentId: string) {
-    const response = await logisticsApi.delete(`/shipments/${shipmentId}`);
-    return response.data;
+  // 計算配送費用
+  static async calculateCost(data: CostCalculationRequest): Promise<ApiResponse<{ cost: number; currency: string }>> {
+      const response = await logisticsApi.post('/calculate-cost', data);
+      return response.data;
   }
 
-  // 追蹤物流
-  static async trackShipment(trackingNumber: string) {
-    const response = await logisticsApi.get(`/shipments/track/${trackingNumber}`);
-    return response.data;
-  }
-
-  // 獲取追蹤事件
-  static async getTrackingEvents(shipmentId: string) {
-    const response = await logisticsApi.get(`/shipments/${shipmentId}/events`);
-    return response.data;
-  }
-
-  // 更新物流狀態
-  static async updateShipmentStatus(shipmentId: string, status: string, location?: string, description?: string) {
-    const response = await logisticsApi.put(`/shipments/${shipmentId}/status`, {
-      status,
-      location,
-      description
-    });
-    return response.data;
-  }
-
-  // 獲取物流統計
-  static async getLogisticsStats(params?: { startDate?: string; endDate?: string }) {
-    const response = await logisticsApi.get('/shipments/stats', { params });
-    return response.data;
-  }
-
-  // 獲取物流概覽
-  static async getLogisticsOverview() {
-    const response = await logisticsApi.get('/shipments/overview');
-    return response.data;
-  }
-
-  // 批量更新物流狀態
-  static async batchUpdateStatus(updates: Array<{ shipmentId: string; status: string; location?: string; description?: string }>) {
-    const response = await logisticsApi.put('/shipments/batch-status', { updates });
+  // 獲取配送統計
+  static async getStats(params?: { period?: string; startDate?: string; endDate?: string }): Promise<ApiResponse<LogisticsStats>> {
+    const response = await logisticsApi.get('/stats', { params });
     return response.data;
   }
 }

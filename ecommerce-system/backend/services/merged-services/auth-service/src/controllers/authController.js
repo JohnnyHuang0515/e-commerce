@@ -1,7 +1,12 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 const { User, Role, Permission } = require('../models');
+
+// Use dynamic import for uuid
+let uuidv4;
+import('uuid').then(uuid => {
+  uuidv4 = uuid.v4;
+});
 
 // 用戶登入
 const login = async (req, res) => {
@@ -54,7 +59,7 @@ const login = async (req, res) => {
       { 
         userId: user.id, 
         email: user.email, 
-        role: user.role?.name || 'user' 
+        role: user.userRole?.name || user.role 
       },
       process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-development',
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }

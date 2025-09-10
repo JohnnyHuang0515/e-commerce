@@ -88,6 +88,36 @@ const createLog = async (req, res) => {
   }
 };
 
+// 批量創建日誌
+const createBatchLogs = async (req, res) => {
+  try {
+    const { logs } = req.body;
+    if (!Array.isArray(logs) || logs.length === 0) {
+      return res.status(400).json({ success: false, message: 'Logs array is required.' });
+    }
+
+    const logEntries = logs.map(log => ({
+      ...log,
+      ip_address: req.ip,
+      user_agent: req.get('User-Agent')
+    }));
+
+    await SystemLog.insertMany(logEntries);
+
+    res.status(201).json({
+      success: true,
+      message: 'Batch logs created successfully',
+      data: { created_count: logs.length }
+    });
+  } catch (error) {
+    console.error('記錄批量日誌錯誤:', error);
+    res.status(500).json({
+      success: false,
+      message: '記錄批量日誌時發生錯誤'
+    });
+  }
+};
+
 // 導出日誌
 const exportLogs = async (req, res) => {
   try {
@@ -347,6 +377,7 @@ const getRealTimeLogs = async (req, res) => {
 module.exports = {
   getLogs,
   createLog,
+  createBatchLogs,
   exportLogs,
   getLogStats,
   cleanupLogs,

@@ -16,6 +16,7 @@ import {
   InboxOutlined,
   SafetyOutlined,
   ThunderboltOutlined,
+  HeartOutlined,
   BugOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
@@ -83,6 +84,11 @@ const MainLayout: React.FC = () => {
       key: '/ai-search',
       icon: <ThunderboltOutlined />,
       label: 'AI智能搜尋',
+    },
+    {
+      key: '/recommendations',
+      icon: <HeartOutlined />,
+      label: 'AI智能推薦',
     },
     {
       key: '/logs',

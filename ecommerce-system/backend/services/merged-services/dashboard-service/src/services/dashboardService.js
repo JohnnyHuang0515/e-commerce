@@ -3,12 +3,12 @@ const { logger } = require('../utils/logger');
 
 // 服務配置
 const SERVICES = {
-  auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3005',
-  user: process.env.USER_SERVICE_URL || 'http://localhost:3002',
-  product: process.env.PRODUCT_SERVICE_URL || 'http://localhost:3001',
+  auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
+  user: process.env.USER_SERVICE_URL || 'http://localhost:3001',
+  product: process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002',
   order: process.env.ORDER_SERVICE_URL || 'http://localhost:3003',
   analytics: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3006',
-  settings: process.env.SETTINGS_SERVICE_URL || 'http://localhost:3007'
+  settings: process.env.SETTINGS_SERVICE_URL || 'http://localhost:3005'
 };
 
 // HTTP 客戶端配置

@@ -96,7 +96,7 @@ export class AuthService {
   // 獲取用戶資料
   static async getProfile(): Promise<ApiResponse<UserProfile>> {
     try {
-      const response = await authApi.get('/auth/profile');
+      const response = await authApi.get('/api/v1/auth/profile');
       return response.data;
     } catch (error) {
       console.error('獲取用戶資料失敗:', error);
@@ -145,7 +145,7 @@ export class AuthService {
   // 驗證 token 有效性
   static async verifyToken(): Promise<ApiResponse<{ valid: boolean; user?: UserProfile }>> {
     try {
-      const response = await authApi.get('/auth/verify');
+      const response = await authApi.get('/api/v1/auth/verify');
       return response.data;
     } catch (error) {
       console.error('驗證 token 失敗:', error);

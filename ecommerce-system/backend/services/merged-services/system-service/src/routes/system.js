@@ -1,6 +1,7 @@
 const express = require('express');
 const systemController = require('../controllers/systemController');
 const dashboardController = require('../controllers/dashboardController');
+const permissionController = require('../controllers/permissionController');
 const { validateSystem } = require('../middleware/validation');
 const { authenticateToken, authorize } = require('../middleware/auth');
 
@@ -305,5 +306,19 @@ router.get('/dashboard/realtime', authenticateToken, authorize(['ADMIN', 'MANAGE
  *         description: 服務器錯誤
  */
 router.get('/dashboard/analytics', authenticateToken, authorize(['ADMIN', 'MANAGER']), dashboardController.getAnalytics);
+
+// 權限管理路由
+router.get('/permissions', authenticateToken, authorize(['ADMIN', 'MANAGER']), permissionController.getPermissions);
+router.get('/permissions/:id', authenticateToken, authorize(['ADMIN', 'MANAGER']), permissionController.getPermissionById);
+router.post('/permissions', authenticateToken, authorize(['ADMIN']), permissionController.createPermission);
+router.put('/permissions/:id', authenticateToken, authorize(['ADMIN']), permissionController.updatePermission);
+router.delete('/permissions/:id', authenticateToken, authorize(['ADMIN']), permissionController.deletePermission);
+
+// 角色管理路由
+router.get('/roles', authenticateToken, authorize(['ADMIN', 'MANAGER']), permissionController.getRoles);
+router.get('/roles/:id', authenticateToken, authorize(['ADMIN', 'MANAGER']), permissionController.getRoleById);
+router.post('/roles', authenticateToken, authorize(['ADMIN']), permissionController.createRole);
+router.put('/roles/:id', authenticateToken, authorize(['ADMIN']), permissionController.updateRole);
+router.delete('/roles/:id', authenticateToken, authorize(['ADMIN']), permissionController.deleteRole);
 
 module.exports = router;

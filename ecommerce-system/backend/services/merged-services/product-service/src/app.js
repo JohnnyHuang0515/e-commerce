@@ -1,208 +1,94 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
-require('dotenv').config();
+const specs = require('./swagger');
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-// 資料庫連接
-const { sequelize, testConnection } = require('./config/postgres');
-const { connectMongoDB } = require('./config/mongodb');
+// Import routes
+const productRoutes = require('./routes/products');
+const categoryRoutes = require('./routes/categories');
+const brandRoutes = require('./routes/brands');
 
-// 路由
-const productRoutes = require('./routes/product');
-const inventoryRoutes = require('./routes/inventory');
-const fileRoutes = require('./routes/file');
+// MongoDB 連接配置
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:password123@localhost:27017/ecommerce?authSource=admin';
 
+// 創建 Express 應用
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3002; // Corrected port for product-service
 
-// 中間件
+// 中間件配置
+app.use(cors());
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
-}));
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 速率限制
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: {
-    success: false,
-    message: '請求過於頻繁，請稍後再試'
-  }
-});
-app.use('/api/', limiter);
+// Swagger API 文檔
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: '電商系統 Product Service API 文檔'
+}));
 
-// Swagger 配置
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'PRODUCT Service API',
-      version: '1.0.0',
-      description: '合併商品、庫存、檔案管理服務 API 文檔'
-    },
-    servers: [
-      {
-        url: `http://localhost:${PORT}`,
-        description: '開發環境'
-      }
-    ]
-  },
-  apis: ['./src/routes/*.js']
-};
-
-const specs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
-
-// 健康檢查
-app.get('/health', async (req, res) => {
-  try {
-    const postgresStatus = await testConnection();
-    
-    res.json({
-      success: true,
-      service: 'PRODUCT Service',
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      databases: {
-        postgresql: postgresStatus ? 'connected' : 'disconnected',
-        mongodb: 'not_required' // MongoDB 不是必需的
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      service: 'PRODUCT Service',
-      status: 'unhealthy',
-      error: error.message
-    });
-  }
-});
-
-// API 路由
+// API Routes
 app.use('/api/v1/products', productRoutes);
-app.use('/api/v1/products', require('./routes/product-test')); // 測試路由
-app.use('/api/v1/inventory', inventoryRoutes);
-app.use('/api/v1/files', fileRoutes);
-app.use('/api/v1/categories', require('./routes/category'));
+app.use('/api/v1/products/categories', categoryRoutes);
+app.use('/api/v1/products/brands', brandRoutes);
 
-// 根路由
+
+// Health Check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'product-service',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Root route
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'PRODUCT Service - 合併商品、庫存、檔案管理服務',
-    version: '1.0.0',
-    endpoints: {
-      products: '/api/v1/products',
-      inventory: '/api/v1/inventory',
-      files: '/api/v1/files',
-      docs: '/api-docs',
-      health: '/health'
+    message: 'Product Service - 商品管理服務',
+    version: '1.0.0'
+  });
+});
+
+// 404 Handler
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: '請求的資源不存在'
     }
   });
 });
 
-// 404 處理
-app.use('*', (req, res) => {
-  res.status(404).json({
+// Error Handling Middleware
+app.use((err, req, res, next) => {
+  console.error('未處理的錯誤:', err);
+  res.status(500).json({
     success: false,
-    message: 'API 端點不存在',
-    path: req.originalUrl
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: '伺服器內部錯誤'
+    }
   });
 });
 
-// 錯誤處理中間件
-app.use((error, req, res, next) => {
-  console.error('PRODUCT Service Error:', error);
-  
-  res.status(error.status || 500).json({
-    success: false,
-    message: error.message || '內部服務器錯誤',
-    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+// 啟動伺服器
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+}).then(() => {
+  console.log('✅ PRODUCT-SERVICE: MongoDB 連線成功');
+  app.listen(PORT, () => {
+    console.log(`🚀 Product Service 啟動成功 on port ${PORT}`);
   });
+}).catch((error) => {
+  console.error('❌ MongoDB 連接錯誤:', error);
+  process.exit(1);
 });
-
-// 初始化資料庫
-const initializeDatabases = async () => {
-  try {
-    console.log('🔄 初始化資料庫連接...');
-    
-    // PostgreSQL 初始化
-    const postgresConnected = await testConnection();
-    
-    // MongoDB 初始化
-    const mongoConnected = await connectMongoDB();
-    
-    console.log('✅ 資料庫初始化完成');
-    console.log(`   - PostgreSQL: ${postgresConnected ? '已連接' : '連接失敗'}`);
-    console.log(`   - MongoDB: ${mongoConnected ? '已連接' : '連接失敗'}`);
-    
-  } catch (error) {
-    console.error('❌ 資料庫初始化失敗:', error);
-    // 不退出，繼續啟動服務
-    console.log('⚠️ 繼續啟動服務，但某些功能可能不可用');
-  }
-};
-
-// 啟動服務器
-const startServer = async () => {
-  try {
-    await initializeDatabases();
-    
-    app.listen(PORT, () => {
-      console.log('');
-      console.log('🚀 PRODUCT Service 啟動成功!');
-      console.log('================================');
-      console.log(`📍 服務地址: http://localhost:${PORT}`);
-      console.log(`📚 API 文檔: http://localhost:${PORT}/api-docs`);
-      console.log(`🔍 健康檢查: http://localhost:${PORT}/health`);
-      console.log('');
-      console.log('🔗 API 端點:');
-      console.log('   - 商品: /api/v1/products');
-      console.log('   - 庫存: /api/v1/inventory');
-      console.log('   - 檔案: /api/v1/files');
-      console.log('================================');
-    });
-  } catch (error) {
-    console.error('❌ 服務啟動失敗:', error);
-    process.exit(1);
-  }
-};
-
-// 優雅關閉
-process.on('SIGTERM', async () => {
-  console.log('🔄 收到 SIGTERM 信號，正在關閉服務...');
-  try {
-    await sequelize.close();
-    console.log('✅ PRODUCT Service 已優雅關閉');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ 關閉服務時發生錯誤:', error);
-    process.exit(1);
-  }
-});
-
-process.on('SIGINT', async () => {
-  console.log('🔄 收到 SIGINT 信號，正在關閉服務...');
-  try {
-    await sequelize.close();
-    console.log('✅ PRODUCT Service 已優雅關閉');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ 關閉服務時發生錯誤:', error);
-    process.exit(1);
-  }
-});
-
-// 啟動服務
-startServer();
-
-module.exports = app;

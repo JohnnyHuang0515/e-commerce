@@ -12,7 +12,8 @@ import {
   Tabs,
   Divider,
   Upload,
-  InputNumber
+  InputNumber,
+  Select
 } from 'antd';
 import { 
   SettingOutlined,
@@ -138,20 +139,26 @@ const Settings: React.FC = () => {
           <Row gutter={[24, 24]}>
             <Col xs={24} lg={12}>
               <Form.Item name="timezone" label="時區">
-                <Select placeholder="請選擇時區">
-                  <Option value="Asia/Taipei">台北時間 (UTC+8)</Option>
-                  <Option value="Asia/Shanghai">上海時間 (UTC+8)</Option>
-                  <Option value="UTC">世界協調時間 (UTC)</Option>
-                </Select>
+                <Select
+                  placeholder="請選擇時區"
+                  options={[
+                    { value: 'Asia/Taipei', label: '台北時間 (UTC+8)' },
+                    { value: 'Asia/Shanghai', label: '上海時間 (UTC+8)' },
+                    { value: 'UTC', label: '世界協調時間 (UTC)' },
+                  ]}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
               <Form.Item name="language" label="預設語言">
-                <Select placeholder="請選擇語言">
-                  <Option value="zh-TW">繁體中文</Option>
-                  <Option value="zh-CN">簡體中文</Option>
-                  <Option value="en">English</Option>
-                </Select>
+                <Select
+                  placeholder="請選擇語言"
+                  options={[
+                    { value: 'zh-TW', label: '繁體中文' },
+                    { value: 'zh-CN', label: '簡體中文' },
+                    { value: 'en', label: 'English' },
+                  ]}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -268,11 +275,14 @@ const Settings: React.FC = () => {
           <Row gutter={[24, 24]}>
             <Col xs={24} lg={12}>
               <Form.Item name="storageType" label="儲存類型">
-                <Select placeholder="請選擇儲存類型">
-                  <Option value="local">本地儲存</Option>
-                  <Option value="s3">Amazon S3</Option>
-                  <Option value="oss">阿里雲 OSS</Option>
-                </Select>
+                <Select
+                  placeholder="請選擇儲存類型"
+                  options={[
+                    { value: 'local', label: '本地儲存' },
+                    { value: 's3', label: 'Amazon S3' },
+                    { value: 'oss', label: '阿里雲 OSS' },
+                  ]}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
@@ -315,12 +325,15 @@ const Settings: React.FC = () => {
             </Col>
             <Col xs={24} lg={12}>
               <Form.Item name="logLevel" label="日誌等級">
-                <Select placeholder="請選擇日誌等級">
-                  <Option value="error">錯誤</Option>
-                  <Option value="warn">警告</Option>
-                  <Option value="info">資訊</Option>
-                  <Option value="debug">除錯</Option>
-                </Select>
+                <Select
+                  placeholder="請選擇日誌等級"
+                  options={[
+                    { value: 'error', label: '錯誤' },
+                    { value: 'warn', label: '警告' },
+                    { value: 'info', label: '資訊' },
+                    { value: 'debug', label: '除錯' },
+                  ]}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -407,256 +420,7 @@ const Settings: React.FC = () => {
           initialValues={settings}
           onFinish={handleSave}
         >
-          <Tabs defaultActiveKey="basic">
-            <TabPane 
-              tab={
-                <Space>
-                  <GlobalOutlined />
-                  <span>基本設定</span>
-                </Space>
-              } 
-              key="basic"
-            >
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item
-                    name="siteName"
-                    label="網站名稱"
-                    rules={[{ required: true, message: '請輸入網站名稱' }]}
-                  >
-                    <Input placeholder="請輸入網站名稱" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="siteDescription" label="網站描述">
-                    <Input placeholder="請輸入網站描述" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="siteLogo" label="網站 Logo">
-                    <Upload
-                      listType="picture-card"
-                      maxCount={1}
-                      beforeUpload={() => false}
-                    >
-                      <div>
-                        <UploadOutlined />
-                        <div style={{ marginTop: 8 }}>上傳 Logo</div>
-                      </div>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="siteFavicon" label="網站圖標">
-                    <Upload
-                      listType="picture-card"
-                      maxCount={1}
-                      beforeUpload={() => false}
-                    >
-                      <div>
-                        <UploadOutlined />
-                        <div style={{ marginTop: 8 }}>上傳圖標</div>
-                      </div>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-              </Row>
-            </TabPane>
-
-            <TabPane 
-              tab={
-                <Space>
-                  <SettingOutlined />
-                  <span>系統設定</span>
-                </Space>
-              } 
-              key="system"
-            >
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="maintenanceMode" label="維護模式" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="registrationEnabled" label="允許註冊" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="emailVerification" label="郵箱驗證" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="maxUploadSize" label="最大上傳大小 (MB)">
-                    <InputNumber min={1} max={100} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="sessionTimeout" label="會話超時 (分鐘)">
-                    <InputNumber min={5} max={1440} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </TabPane>
-
-            <TabPane 
-              tab={
-                <Space>
-                  <MailOutlined />
-                  <span>郵件設定</span>
-                </Space>
-              } 
-              key="email"
-            >
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item
-                    name="smtpHost"
-                    label="SMTP 主機"
-                    rules={[{ required: true, message: '請輸入 SMTP 主機' }]}
-                  >
-                    <Input placeholder="smtp.example.com" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item
-                    name="smtpPort"
-                    label="SMTP 端口"
-                    rules={[{ required: true, message: '請輸入 SMTP 端口' }]}
-                  >
-                    <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item
-                    name="smtpUser"
-                    label="SMTP 用戶名"
-                    rules={[{ required: true, message: '請輸入 SMTP 用戶名' }]}
-                  >
-                    <Input placeholder="admin@example.com" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item
-                    name="smtpPassword"
-                    label="SMTP 密碼"
-                    rules={[{ required: true, message: '請輸入 SMTP 密碼' }]}
-                  >
-                    <Input.Password placeholder="請輸入密碼" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="smtpSecure" label="使用 SSL/TLS" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </TabPane>
-
-            <TabPane 
-              tab={
-                <Space>
-                  <SecurityScanOutlined />
-                  <span>安全設定</span>
-                </Space>
-              } 
-              key="security"
-            >
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="passwordMinLength" label="密碼最小長度">
-                    <InputNumber min={6} max={20} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="passwordRequireSpecial" label="要求特殊字符" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="loginAttempts" label="最大登入嘗試次數">
-                    <InputNumber min={3} max={10} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="lockoutDuration" label="鎖定時間 (分鐘)">
-                    <InputNumber min={5} max={60} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="twoFactorAuth" label="雙因素認證" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </TabPane>
-
-            <TabPane 
-              tab={
-                <Space>
-                  <DatabaseOutlined />
-                  <span>通知設定</span>
-                </Space>
-              } 
-              key="notifications"
-            >
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={8}>
-                  <Form.Item name="emailNotifications" label="郵件通知" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={8}>
-                  <Form.Item name="smsNotifications" label="短信通知" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={8}>
-                  <Form.Item name="pushNotifications" label="推送通知" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Divider />
-
-              <Row gutter={[24, 24]}>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="orderNotifications" label="訂單通知" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} lg={12}>
-                  <Form.Item name="userNotifications" label="用戶通知" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </TabPane>
-          </Tabs>
+          <Tabs defaultActiveKey="basic" items={tabItems} />
 
           <Divider />
 

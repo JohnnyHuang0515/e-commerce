@@ -1,79 +1,76 @@
 #!/bin/bash
 
-echo "🔍 檢查所有合併服務狀態..."
-echo "=================================="
+# merged-services 狀態檢查腳本
+# 作者: AI Assistant
+# 日期: 2025-09-10
 
-# 服務配置
-declare -A SERVICES=(
-    ["AUTH-SERVICE"]="3001"
-    ["PRODUCT-SERVICE"]="3002"
+# 獲取腳本所在的絕對目錄路徑
+SERVICES_ROOT=$(cd "$(dirname "$0")" && pwd)
+PROJECT_ROOT=$(cd "$SERVICES_ROOT/../../.." && pwd)
+
+echo "📊 merged-services 狀態檢查"
+echo "============================"
+echo "📁 服務目錄: $SERVICES_ROOT"
+echo "📁 專案根目錄: $PROJECT_ROOT"
+echo ""
+
+# 檢查 docker-compose.yml 文件是否存在
+COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "❌ 錯誤: docker-compose.yml 文件未找到！"
+    exit 1
+fi
+
+echo "🔍 檢查容器狀態..."
+echo "===================="
+docker ps --filter "name=ecommerce-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "(auth|product|order|ai|system|analytics)"
+
+echo ""
+echo "🧪 測試服務健康檢查..."
+echo "======================="
+
+# 定義服務列表
+declare -A services=(
+    ["AUTH-SERVICE"]="3002"
+    ["PRODUCT-SERVICE"]="3001"
     ["ORDER-SERVICE"]="3003"
     ["AI-SERVICE"]="3004"
     ["SYSTEM-SERVICE"]="3005"
-    ["ANALYTICS-SERVICE"]="3007"
-    ["DASHBOARD-SERVICE"]="3008"
+    ["ANALYTICS-SERVICE"]="3006"
 )
 
-# 檢查每個服務
-for service in "${!SERVICES[@]}"; do
-    port=${SERVICES[$service]}
-    echo -n "$service (Port $port): "
+# 測試每個服務
+for service in "${!services[@]}"; do
+    port="${services[$service]}"
+    echo -n "🔍 $service (:$port): "
     
-    # 檢查端口是否被佔用
-    if lsof -i :$port > /dev/null 2>&1; then
-        # 檢查健康端點
-        if [ "$service" = "DASHBOARD-SERVICE" ]; then
-            health_url="http://localhost:$port/api/v1/health"
-        else
-            health_url="http://localhost:$port/health"
-        fi
-        
-        if curl -s $health_url > /dev/null 2>&1; then
-            echo "✅ 運行中 (健康)"
-        else
-            echo "⚠️ 運行中 (健康檢查失敗)"
-        fi
+    if curl -s --max-time 5 "http://localhost:$port/health" > /dev/null 2>&1; then
+        echo "✅ 健康"
     else
-        echo "❌ 未運行"
+        echo "❌ 無回應"
     fi
 done
 
-echo "=================================="
-
-# 檢查資料庫狀態
 echo ""
-echo "🗄️ 資料庫狀態檢查："
-echo "--------------------------------"
-
-# 檢查 PostgreSQL
-echo -n "PostgreSQL (Port 5432): "
-if pg_isready -h localhost -p 5432 -U admin > /dev/null 2>&1; then
-    echo "✅ 運行中"
+echo "🌐 測試 API 網關..."
+echo "==================="
+echo -n "🔍 Nginx (8080): "
+if curl -s --max-time 5 "http://localhost:8080/health" > /dev/null 2>&1; then
+    echo "✅ 正常"
 else
-    echo "❌ 未運行"
+    echo "❌ 無回應"
 fi
 
-# 檢查 MongoDB
-echo -n "MongoDB (Port 27017): "
-if pgrep -x "mongod" > /dev/null; then
-    echo "✅ 運行中"
-else
-    echo "❌ 未運行"
-fi
-
-echo "=================================="
-
-# 顯示服務 URL
 echo ""
-echo "🌐 服務 URL："
-for service in "${!SERVICES[@]}"; do
-    port=${SERVICES[$service]}
-    echo "  - $service: http://localhost:$port"
-done
-
+echo "📋 服務摘要"
+echo "============"
+echo "🔐 AUTH-SERVICE:     http://localhost:3002"
+echo "📦 PRODUCT-SERVICE:  http://localhost:3001"
+echo "📋 ORDER-SERVICE:    http://localhost:3003"
+echo "🧠 AI-SERVICE:       http://localhost:3004"
+echo "⚙️  SYSTEM-SERVICE:  http://localhost:3005"
+echo "📊 ANALYTICS-SERVICE: http://localhost:3006"
+echo "🌐 API 網關:         http://localhost:8080"
 echo ""
-echo "📚 API 文檔："
-for service in "${!SERVICES[@]}"; do
-    port=${SERVICES[$service]}
-    echo "  - $service: http://localhost:$port/api-docs"
-done
+echo "ℹ️  使用 'docker compose logs -f [service-name]' 查看詳細日誌"
+echo "ℹ️  使用 './start-all-services.sh' 重新啟動所有服務"

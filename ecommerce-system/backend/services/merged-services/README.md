@@ -74,19 +74,33 @@ tail -f logs/auth-service.log
 
 ## 🗄️ 資料庫
 
-### PostgreSQL (訂單服務)
-- 主機: localhost
-- 端口: 5432
-- 用戶: admin
-- 密碼: password123
-- 資料庫: ecommerce_transactions
+系統採用混合資料庫架構。核心交易相關服務已遷移至 PostgreSQL，而其他服務則繼續使用 MongoDB。
 
-### MongoDB (其他服務)
-- 主機: localhost
-- 端口: 27017
-- 用戶: ecommerce_user
-- 密碼: ecommerce_password
-- 資料庫: ecommerce
+### 🐘 PostgreSQL
+- **使用服務**:
+  - `order-service` (訂單、支付、物流)
+  - `system-service` (系統配置、監控、日誌)
+  - `auth-service` (部分功能，遷移中)
+- **主機**: localhost
+- **端口**: 5432
+- **用戶**: admin
+- **密碼**: password123
+- **資料庫**: ecommerce_transactions
+
+### 🍃 MongoDB
+- **使用服務**:
+  - `product-service` (商品、分類、庫存)
+  - `ai-service` (搜尋、推薦)
+  - `analytics-service` (數據分析、報告)
+  - `dashboard-service` (儀表板統計)
+  - `auth-service` (部分功能，遷移中)
+- **主機**: localhost
+- **端口**: 27017
+- **用戶**: ecommerce_user
+- **密碼**: ecommerce_password
+- **資料庫**: ecommerce
+
+**注意**: 系統正在進行資料庫架構的遷移。`auth-service` 目前處於連接兩種資料庫的過渡階段。關於架構的詳細規劃，請參考根目錄下的 `DATABASE_DESIGN.md` 文件。
 
 ## 🔍 故障排除
 

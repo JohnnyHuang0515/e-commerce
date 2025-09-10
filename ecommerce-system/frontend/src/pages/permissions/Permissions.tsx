@@ -81,67 +81,6 @@ const Permissions: React.FC = () => {
   const removeUserRoleMutation = useRemoveUserRole();
   const initializeDataMutation = useInitializeDefaultData();
 
-  // Tabs items 配置
-  const tabItems = [
-    {
-      key: 'permissions',
-      label: '權限管理',
-      children: (
-        <Table
-          columns={permissionColumns}
-          dataSource={permissionsData?.data || []}
-          loading={permissionsLoading}
-          rowKey="_id"
-          pagination={{
-            total: permissionsData?.total || 0,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 條記錄`,
-          }}
-        />
-      ),
-    },
-    {
-      key: 'roles',
-      label: '角色管理',
-      children: (
-        <Table
-          columns={roleColumns}
-          dataSource={rolesData?.data || []}
-          loading={rolesLoading}
-          rowKey="_id"
-          pagination={{
-            total: rolesData?.total || 0,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 條記錄`,
-          }}
-        />
-      ),
-    },
-    {
-      key: 'user-roles',
-      label: '用戶角色',
-      children: (
-        <Table
-          columns={userRoleColumns}
-          dataSource={userRolesData?.data || []}
-          loading={userRolesLoading}
-          rowKey="_id"
-          pagination={{
-            total: userRolesData?.total || 0,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 條記錄`,
-          }}
-        />
-      ),
-    },
-  ];
-
   // 權限表格列定義
   const permissionColumns = [
     {
@@ -341,6 +280,67 @@ const Permissions: React.FC = () => {
             </Button>
           </Popconfirm>
         </Space>
+      ),
+    },
+  ];
+
+  // Tabs items 配置
+  const tabItems = [
+    {
+      key: 'permissions',
+      label: '權限管理',
+      children: (
+        <Table
+          columns={permissionColumns}
+          dataSource={permissionsData?.data || []}
+          loading={permissionsLoading}
+          rowKey="_id"
+          pagination={{
+            total: permissionsData?.total || 0,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 條記錄`,
+          }}
+        />
+      ),
+    },
+    {
+      key: 'roles',
+      label: '角色管理',
+      children: (
+        <Table
+          columns={roleColumns}
+          dataSource={rolesData?.data || []}
+          loading={rolesLoading}
+          rowKey="_id"
+          pagination={{
+            total: rolesData?.total || 0,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 條記錄`,
+          }}
+        />
+      ),
+    },
+    {
+      key: 'user-roles',
+      label: '用戶角色',
+      children: (
+        <Table
+          columns={userRoleColumns}
+          dataSource={userRolesData?.data || []}
+          loading={userRolesLoading}
+          rowKey="_id"
+          pagination={{
+            total: userRolesData?.total || 0,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 條記錄`,
+          }}
+        />
       ),
     },
   ];

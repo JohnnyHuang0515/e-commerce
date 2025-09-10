@@ -24,7 +24,7 @@ import {
   DatabaseOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
-import { aiSearchService, SearchRequest, SearchResult, SearchSuggestion, ServiceStats } from '../../services/aiSearchService';
+import AiService, { SearchRequest, SearchResult, SearchSuggestion, ServiceStats } from '../../services/aiService';
 import PageHeader from '../../components/common/PageHeader';
 
 const { Search } = Input;
@@ -64,7 +64,7 @@ const AISearch: React.FC = () => {
   const loadServiceStats = async () => {
     setStatsLoading(true);
     try {
-      const stats = await aiSearchService.getServiceStats();
+      const stats = await AiService.getServiceStats();
       setServiceStats(stats);
     } catch (error) {
       console.error('載入服務統計失敗:', error);
@@ -76,7 +76,7 @@ const AISearch: React.FC = () => {
   const loadSuggestions = async () => {
     setSuggestionsLoading(true);
     try {
-      const response = await aiSearchService.getSearchSuggestions(searchQuery, 5);
+      const response = await AiService.getSearchSuggestions(searchQuery, 5);
       setSuggestions(response.data);
     } catch (error) {
       console.error('載入搜尋建議失敗:', error);
@@ -99,7 +99,7 @@ const AISearch: React.FC = () => {
         threshold: searchParams.threshold,
       };
 
-      const response = await aiSearchService.searchProducts(request);
+      const response = await AiService.search(request);
       setSearchResults(response.data);
       setLastSearchTime(Date.now() - startTime);
     } catch (error: any) {

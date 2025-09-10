@@ -26,7 +26,7 @@ import {
 } from '@ant-design/icons';
 import PageHeader from '../../components/common/PageHeader';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useUserStats } from '../../hooks/useApi';
-import UserService from '../../services/userService';
+import AuthService from '../../services/authService';
 import './Users.less';
 
 const { Search } = Input;
@@ -304,7 +304,7 @@ const Users: React.FC = () => {
 
   const handleExport = async () => {
     try {
-      const blob = await UserService.exportUsers(searchParams);
+      const blob = await AuthService.exportUsers(searchParams);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

@@ -1,5 +1,25 @@
 const { RecommendationLog, UserBehavior, SearchIndex } = require('../models');
+const VectorRecommendationService = require('../services/vectorRecommendationService');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../utils/logger');
+
+// 向量推薦服務實例
+let vectorRecommendationService = null;
+
+// 初始化向量推薦服務
+const initializeVectorRecommendationService = async (settings) => {
+  try {
+    if (!vectorRecommendationService) {
+      vectorRecommendationService = new VectorRecommendationService(settings);
+      await vectorRecommendationService.initialize();
+      logger.info('✅ 向量推薦服務初始化成功');
+    }
+    return true;
+  } catch (error) {
+    logger.error('❌ 向量推薦服務初始化失敗:', error);
+    return false;
+  }
+};
 
 // 獲取推薦項目
 const getRecommendations = async (req, res) => {
@@ -10,20 +30,22 @@ const getRecommendations = async (req, res) => {
 
     let recommendations = [];
 
-    switch (type) {
-      case 'collaborative':
-        recommendations = await getCollaborativeRecommendations(userId, item_type, limit);
-        break;
-      case 'content_based':
-        recommendations = await getContentBasedRecommendations(userId, item_type, limit);
-        break;
-      case 'trending':
-        recommendations = await getTrendingRecommendations(item_type, limit);
-        break;
-      case 'hybrid':
-      default:
-        recommendations = await getHybridRecommendations(userId, item_type, limit);
-        break;
+    // 優先使用向量推薦服務
+    if (vectorRecommendationService && vectorRecommendationService.initialized) {
+      const vectorResult = await vectorRecommendationService.getPersonalizedRecommendations(
+        userId, 
+        { limit, recommendationType: type, itemType: item_type }
+      );
+      
+      if (vectorResult.success) {
+        recommendations = vectorResult.recommendations;
+      } else {
+        logger.warn('向量推薦失敗，使用傳統方法:', vectorResult.error);
+        recommendations = await getTraditionalRecommendations(userId, type, item_type, limit);
+      }
+    } else {
+      // 使用傳統推薦方法
+      recommendations = await getTraditionalRecommendations(userId, type, item_type, limit);
     }
 
     // 記錄推薦日誌
@@ -31,7 +53,7 @@ const getRecommendations = async (req, res) => {
       const recommendationLog = new RecommendationLog({
         user_id: userId,
         item_id: rec.item_id,
-        item_type: rec.item_type,
+        item_type: rec.item_type || item_type,
         recommendation_type: type,
         score: rec.score,
         reason: rec.reason,
@@ -45,36 +67,60 @@ const getRecommendations = async (req, res) => {
       data: {
         recommendations: recommendations,
         type: type,
-        total: recommendations.length
+        total: recommendations.length,
+        method: vectorRecommendationService && vectorRecommendationService.initialized ? 'vector' : 'traditional'
       }
     });
   } catch (error) {
-    console.error('獲取推薦錯誤:', error);
+    logger.error('獲取推薦錯誤:', error);
     res.status(500).json({
       success: false,
-      message: '獲取推薦時發生錯誤'
+      message: '獲取推薦時發生錯誤',
+      error: error.message
     });
+  }
+};
+
+// 傳統推薦方法（向後兼容）
+const getTraditionalRecommendations = async (userId, type, itemType, limit) => {
+  switch (type) {
+    case 'collaborative':
+      return await getCollaborativeRecommendations(userId, itemType, limit);
+    case 'content_based':
+      return await getContentBasedRecommendations(userId, itemType, limit);
+    case 'trending':
+      return await getTrendingRecommendations(itemType, limit);
+    case 'hybrid':
+    default:
+      return await getHybridRecommendations(userId, itemType, limit);
   }
 };
 
 // 協同過濾推薦
 const getCollaborativeRecommendations = async (userId, itemType, limit) => {
   try {
-    // 獲取用戶歷史行為
+    // 獲取用戶歷史行為，增加權重
     const userBehaviors = await UserBehavior.find({
       user_id: userId,
-      action: { $in: ['view', 'click', 'purchase'] }
-    }).sort({ created_at: -1 }).limit(100);
+      action: { $in: ['view', 'click', 'purchase', 'add_to_cart', 'like'] }
+    }).sort({ created_at: -1 }).limit(200);
 
     if (userBehaviors.length === 0) {
       return getTrendingRecommendations(itemType, limit);
     }
 
-    // 找到相似用戶
-    const similarUsers = await findSimilarUsers(userId, userBehaviors);
+    // 計算用戶行為權重
+    const userItemWeights = calculateUserItemWeights(userBehaviors);
     
-    // 基於相似用戶的行為推薦
-    const recommendations = await getRecommendationsFromSimilarUsers(similarUsers, userId, itemType, limit);
+    // 找到相似用戶（改進算法）
+    const similarUsers = await findSimilarUsersImproved(userId, userItemWeights);
+    
+    if (similarUsers.length === 0) {
+      return getTrendingRecommendations(itemType, limit);
+    }
+    
+    // 基於相似用戶的行為推薦（改進算法）
+    const recommendations = await getRecommendationsFromSimilarUsersImproved(similarUsers, userId, itemType, limit);
     
     return recommendations;
   } catch (error) {
@@ -455,6 +501,196 @@ const findSimilarItems = async (referenceItem, itemType, limit) => {
   }));
 };
 
+// 輔助函數：計算用戶行為權重
+const calculateUserItemWeights = (userBehaviors) => {
+  const weights = {};
+  const actionWeights = {
+    'purchase': 5,
+    'add_to_cart': 3,
+    'like': 2,
+    'click': 1,
+    'view': 0.5
+  };
+  
+  userBehaviors.forEach(behavior => {
+    const itemId = behavior.item_id;
+    const weight = actionWeights[behavior.action] || 0;
+    const timeDecay = Math.exp(-0.1 * (Date.now() - new Date(behavior.created_at).getTime()) / (1000 * 60 * 60 * 24)); // 時間衰減
+    
+    if (!weights[itemId]) {
+      weights[itemId] = 0;
+    }
+    weights[itemId] += weight * timeDecay;
+  });
+  
+  return weights;
+};
+
+// 輔助函數：改進的相似用戶查找
+const findSimilarUsersImproved = async (userId, userItemWeights) => {
+  const userItems = Object.keys(userItemWeights);
+  
+  if (userItems.length === 0) return [];
+  
+  const similarUsers = await UserBehavior.aggregate([
+    {
+      $match: {
+        user_id: { $ne: userId },
+        item_id: { $in: userItems },
+        action: { $in: ['view', 'click', 'purchase', 'add_to_cart', 'like'] }
+      }
+    },
+    {
+      $group: {
+        _id: '$user_id',
+        behaviors: {
+          $push: {
+            item_id: '$item_id',
+            action: '$action',
+            created_at: '$created_at'
+          }
+        }
+      }
+    },
+    {
+      $addFields: {
+        similarity_score: {
+          $let: {
+            vars: {
+              userBehaviors: '$behaviors'
+            },
+            in: {
+              $divide: [
+                {
+                  $sum: {
+                    $map: {
+                      input: '$userBehaviors',
+                      as: 'behavior',
+                      in: {
+                        $cond: [
+                          { $in: ['$$behavior.item_id', userItems] },
+                          {
+                            $multiply: [
+                              { $switch: {
+                                branches: [
+                                  { case: { $eq: ['$$behavior.action', 'purchase'] }, then: 5 },
+                                  { case: { $eq: ['$$behavior.action', 'add_to_cart'] }, then: 3 },
+                                  { case: { $eq: ['$$behavior.action', 'like'] }, then: 2 },
+                                  { case: { $eq: ['$$behavior.action', 'click'] }, then: 1 },
+                                  { case: { $eq: ['$$behavior.action', 'view'] }, then: 0.5 }
+                                ],
+                                default: 0
+                              }},
+                              userItemWeights['$$behavior.item_id'] || 0
+                            ]
+                          },
+                          0
+                        ]
+                      }
+                    }
+                  }
+                },
+                { $size: '$behaviors' }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      $sort: { similarity_score: -1 }
+    },
+    {
+      $limit: 20
+    }
+  ]);
+
+  return similarUsers.map(u => ({
+    user_id: u._id,
+    similarity_score: u.similarity_score
+  }));
+};
+
+// 輔助函數：改進的基於相似用戶推薦
+const getRecommendationsFromSimilarUsersImproved = async (similarUsers, userId, itemType, limit) => {
+  const similarUserIds = similarUsers.map(u => u.user_id);
+  
+  const recommendations = await UserBehavior.aggregate([
+    {
+      $match: {
+        user_id: { $in: similarUserIds },
+        item_type: itemType,
+        action: { $in: ['view', 'click', 'purchase', 'add_to_cart', 'like'] }
+      }
+    },
+    {
+      $group: {
+        _id: '$item_id',
+        total_score: {
+          $sum: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$action', 'purchase'] }, then: 5 },
+                { case: { $eq: ['$action', 'add_to_cart'] }, then: 3 },
+                { case: { $eq: ['$action', 'like'] }, then: 2 },
+                { case: { $eq: ['$action', 'click'] }, then: 1 },
+                { case: { $eq: ['$action', 'view'] }, then: 0.5 }
+              ],
+              default: 0
+            }
+          }
+        },
+        user_count: { $addToSet: '$user_id' }
+      }
+    },
+    {
+      $addFields: {
+        avg_score: { $divide: ['$total_score', { $size: '$user_count' }] }
+      }
+    },
+    {
+      $sort: { avg_score: -1 }
+    },
+    {
+      $limit: limit * 2 // 獲取更多候選項目
+    }
+  ]);
+
+  // 獲取項目詳情
+  const itemIds = recommendations.map(r => r._id);
+  const items = await SearchIndex.find({
+    item_id: { $in: itemIds },
+    item_type: itemType
+  }).lean();
+
+  // 排除用戶已經互動過的項目
+  const userInteractedItems = await UserBehavior.distinct('item_id', {
+    user_id: userId,
+    item_type: itemType
+  });
+
+  return items
+    .filter(item => !userInteractedItems.includes(item.item_id))
+    .map(item => {
+      const rec = recommendations.find(r => r._id === item.item_id);
+      return {
+        item_id: item.item_id,
+        item_type: item.item_type,
+        title: item.title,
+        description: item.description,
+        score: Math.min((rec?.avg_score || 0) / 10, 1),
+        reason: '基於相似用戶的喜好',
+        metadata: {
+          categories: item.categories,
+          tags: item.tags,
+          popularity_score: item.popularity_score
+        }
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+};
+
 // 輔助函數：計算相似性分數
 const calculateSimilarityScore = (item1, item2) => {
   let score = 0;
@@ -487,5 +723,6 @@ module.exports = {
   getPersonalizedRecommendations,
   getTrendingItems,
   recordClick,
-  getRecommendationAnalytics
+  getRecommendationAnalytics,
+  initializeVectorRecommendationService
 };

@@ -1,205 +1,126 @@
-import { api } from './api';
+import { permissionApi, ApiResponse, PaginatedResponse } from './api';
 
 // 權限相關接口定義
 export interface Permission {
-  _id: string;
+  id: string;
   name: string;
+  displayName: string;
   description?: string;
   module: string;
   action: string;
-  category?: string;
+  category: string;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface Role {
-  _id: string;
+  id: string;
   name: string;
+  displayName: string;
   description?: string;
-  permissions: Permission[];
+  permissions: string[];
+  permissionCount: number;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  isSystem: boolean;
 }
 
 export interface UserRole {
-  _id: string;
+  id: string;
   userId: string;
   roleId: string;
-  role?: Role;
-  assignedBy?: string;
+  assignedAt: string;
   expiresAt?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  isValid: boolean;
 }
 
 export interface PermissionCheckRequest {
-  userId: string;
-  permissions: string[];
+  permission: string;
+  resource?: string;
 }
 
-export interface PermissionCheckResponse {
-  success: boolean;
-  data: {
-    hasPermission: boolean;
-    permissions: string[];
-    missingPermissions: string[];
-  };
-  error?: string;
-}
-
-export interface PermissionSearchParams {
-  module?: string;
-  action?: string;
-  category?: string;
-  isActive?: boolean;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+export interface AssignRoleRequest {
+    userId: string;
+    roleId: string;
+    expiresAt?: string;
+    reason?: string;
 }
 
 export interface RoleSearchParams {
-  name?: string;
-  isActive?: boolean;
   page?: number;
   limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  search?: string;
+  isActive?: boolean;
 }
 
-export interface UserRoleSearchParams {
-  userId?: string;
-  roleId?: string;
-  isActive?: boolean;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+export interface PermissionSearchParams {
+    module?: 'users' | 'products' | 'orders' | 'analytics' | 'system' | 'payments' | 'logistics' | 'inventory';
+    category?: 'basic' | 'advanced' | 'admin' | 'system';
 }
+
 
 // Permission Service 類
 export class PermissionService {
-  private baseUrl = 'http://localhost:3013/api/v1';
 
-  // 權限管理
-  async getPermissions(params?: PermissionSearchParams): Promise<{ data: Permission[]; total: number }> {
-    const response = await api.get(`${this.baseUrl}/permissions`, { params });
+  // 權限檢查
+  static async checkPermission(request: PermissionCheckRequest): Promise<ApiResponse<{ hasPermission: boolean }>> {
+    const response = await permissionApi.post('/check', request);
     return response.data;
   }
 
-  async getPermissionById(id: string): Promise<Permission> {
-    const response = await api.get(`${this.baseUrl}/permissions/${id}`);
-    return response.data.data;
-  }
-
-  async createPermission(permission: Partial<Permission>): Promise<Permission> {
-    const response = await api.post(`${this.baseUrl}/permissions`, permission);
-    return response.data.data;
-  }
-
-  async updatePermission(id: string, permission: Partial<Permission>): Promise<Permission> {
-    const response = await api.put(`${this.baseUrl}/permissions/${id}`, permission);
-    return response.data.data;
-  }
-
-  async deletePermission(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/permissions/${id}`);
+  // 用戶權限管理
+  static async getUserPermissions(userId: string): Promise<ApiResponse<{ permissions: string[], roles: UserRole[] }>> {
+    const response = await permissionApi.get(`/user/${userId}`);
+    return response.data;
   }
 
   // 角色管理
-  async getRoles(params?: RoleSearchParams): Promise<{ data: Role[]; total: number }> {
-    const response = await api.get(`${this.baseUrl}/roles`, { params });
+  static async getRoles(params?: RoleSearchParams): Promise<ApiResponse<PaginatedResponse<Role>>> {
+    const response = await permissionApi.get('/roles', { params });
     return response.data;
   }
 
-  async getRoleById(id: string): Promise<Role> {
-    const response = await api.get(`${this.baseUrl}/roles/${id}`);
-    return response.data.data;
-  }
-
-  async createRole(role: Partial<Role>): Promise<Role> {
-    const response = await api.post(`${this.baseUrl}/roles`, role);
-    return response.data.data;
-  }
-
-  async updateRole(id: string, role: Partial<Role>): Promise<Role> {
-    const response = await api.put(`${this.baseUrl}/roles/${id}`, role);
-    return response.data.data;
-  }
-
-  async deleteRole(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/roles/${id}`);
-  }
-
-  async assignPermissionsToRole(roleId: string, permissionIds: string[]): Promise<Role> {
-    const response = await api.post(`${this.baseUrl}/roles/${roleId}/permissions`, {
-      permissionIds
-    });
-    return response.data.data;
-  }
-
-  async removePermissionsFromRole(roleId: string, permissionIds: string[]): Promise<Role> {
-    const response = await api.delete(`${this.baseUrl}/roles/${roleId}/permissions`, {
-      data: { permissionIds }
-    });
-    return response.data.data;
-  }
-
-  // 用戶角色管理
-  async getUserRoles(params?: UserRoleSearchParams): Promise<{ data: UserRole[]; total: number }> {
-    const response = await api.get(`${this.baseUrl}/user-roles`, { params });
+  static async createRole(roleData: Partial<Role>): Promise<ApiResponse<{ role: Role }>> {
+    const response = await permissionApi.post('/roles', roleData);
     return response.data;
   }
 
-  async getUserRolesByUserId(userId: string): Promise<UserRole[]> {
-    const response = await api.get(`${this.baseUrl}/user-roles/user/${userId}`);
-    return response.data.data;
-  }
-
-  async assignUserRole(userId: string, roleId: string, expiresAt?: string): Promise<UserRole> {
-    const response = await api.post(`${this.baseUrl}/user-roles`, {
-      userId,
-      roleId,
-      expiresAt
-    });
-    return response.data.data;
-  }
-
-  async removeUserRole(userRoleId: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/user-roles/${userRoleId}`);
-  }
-
-  // 權限檢查
-  async checkPermission(request: PermissionCheckRequest): Promise<PermissionCheckResponse> {
-    const response = await api.post(`${this.baseUrl}/permissions/check`, request);
+  static async getRole(roleId: string): Promise<ApiResponse<{ role: Role }>> {
+    const response = await permissionApi.get(`/role/${roleId}`);
     return response.data;
   }
 
-  async getUserPermissions(userId: string): Promise<string[]> {
-    const response = await api.get(`${this.baseUrl}/permissions/user/${userId}`);
-    return response.data.data;
+  static async updateRole(roleId: string, permissions: string[]): Promise<ApiResponse<{ role: Role }>> {
+    const response = await permissionApi.put(`/role/${roleId}`, { permissions });
+    return response.data;
+  }
+
+  // 用戶角色分配
+  static async assignRole(data: AssignRoleRequest): Promise<ApiResponse<{ userRole: UserRole }>> {
+    const response = await permissionApi.post('/assign', data);
+    return response.data;
+  }
+
+  static async removeRoleFromUser(userId: string, roleId: string): Promise<ApiResponse<void>> {
+    const response = await permissionApi.delete(`/user/${userId}/role/${roleId}`);
+    return response.data;
+  }
+
+  // 權限列表
+  static async getPermissions(params?: PermissionSearchParams): Promise<ApiResponse<{ permissions: Permission[] }>> {
+    const response = await permissionApi.get('/permissions', { params });
+    return response.data;
   }
 
   // 統計信息
-  async getPermissionStats(): Promise<{
-    totalPermissions: number;
-    totalRoles: number;
-    totalUserRoles: number;
-    permissionsByModule: Record<string, number>;
-    rolesByStatus: Record<string, number>;
-  }> {
-    const response = await api.get(`${this.baseUrl}/permissions/stats`);
-    return response.data.data;
+  static async getStats(): Promise<ApiResponse<any>> {
+    const response = await permissionApi.get('/stats');
+    return response.data;
   }
 
-  // 初始化默認數據
-  async initializeDefaultData(): Promise<void> {
-    await api.post(`${this.baseUrl}/permissions/initialize`);
+  // 初始化
+  static async initialize(): Promise<ApiResponse<void>> {
+      const response = await permissionApi.post('/initialize');
+      return response.data;
   }
 }
 
-// 導出服務實例
-export const permissionService = new PermissionService();
+export default PermissionService;

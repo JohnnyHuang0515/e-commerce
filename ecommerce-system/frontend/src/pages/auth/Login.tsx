@@ -76,7 +76,7 @@ const Login: React.FC = () => {
         <div className="login-content">
           <Row justify="center" align="middle" style={{ minHeight: '100vh' }}>
             <Col xs={24} sm={24} md={20} lg={16} xl={14}>
-              <Card className="login-card" bordered={false}>
+              <Card className="login-card" variant="borderless">
                 <div className="login-header">
                   <div className="logo-section">
                     <ShoppingOutlined className="logo-icon" />

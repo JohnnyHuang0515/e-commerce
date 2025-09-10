@@ -14,7 +14,7 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3007',
+        url: 'http://localhost:3005',
         description: '開發環境'
       },
       {

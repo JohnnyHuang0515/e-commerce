@@ -5,14 +5,38 @@ const morgan = require('morgan');
 const mongoose = require('mongoose');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+
+// MongoDB 連接
+const connectMongoDB = async () => {
+  try {
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://admin:password123@mongodb:27017/ecommerce_dashboard?authSource=admin';
+    
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 5000
+    });
+    
+    console.log('✅ DASHBOARD-SERVICE: MongoDB 連線成功');
+    return true;
+  } catch (error) {
+    console.error('❌ DASHBOARD-SERVICE: MongoDB 連線失敗:', error);
+    return false;
+  }
+};
+
+// 初始化資料庫連接
+connectMongoDB();
 
 const dashboardRoutes = require('./routes/dashboard');
 const { errorHandler } = require('./middleware/errorHandler');
 const { logger } = require('./utils/logger');
 
 const app = express();
-const PORT = process.env.PORT || 3008;
+const PORT = process.env.PORT || 3008; // <--- 修正端口
 
 // Swagger 配置
 const swaggerOptions = {
@@ -22,10 +46,6 @@ const swaggerOptions = {
       title: 'Dashboard Service API',
       version: '1.0.0',
       description: '電商系統儀表板服務 API 文檔',
-      contact: {
-        name: 'API Support',
-        email: 'support@example.com'
-      }
     },
     servers: [
       {
@@ -33,15 +53,6 @@ const swaggerOptions = {
         description: '開發環境'
       }
     ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT'
-        }
-      }
-    }
   },
   apis: ['./src/routes/*.js']
 };
@@ -50,7 +61,12 @@ const specs = swaggerJsdoc(swaggerOptions);
 
 // 中間件
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['DNT', 'User-Agent', 'X-Requested-With', 'If-Modified-Since', 'Cache-Control', 'Content-Type', 'Range', 'Authorization', 'x-request-id']
+}));
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -61,8 +77,6 @@ app.get('/api/v1/health', (req, res) => {
     service: 'dashboard-service',
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    version: '1.0.0'
   });
 });
 
@@ -77,42 +91,15 @@ app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'API 端點不存在',
-    path: req.originalUrl
   });
 });
 
 // 錯誤處理
 app.use(errorHandler);
 
-// MongoDB 連線
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ecommerce_dashboard')
-.then(() => {
-  logger.info('✅ MongoDB 連線成功');
-})
-.catch((error) => {
-  logger.error('❌ MongoDB 連線失敗:', error);
-  process.exit(1);
-});
-
-// 優雅關閉
-process.on('SIGTERM', async () => {
-  logger.info('收到 SIGTERM 信號，準備關閉服務...');
-  await mongoose.connection.close();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  logger.info('收到 SIGINT 信號，準備關閉服務...');
-  await mongoose.connection.close();
-  process.exit(0);
-});
-
 // 啟動服務器
 app.listen(PORT, () => {
-  logger.info(`🚀 Dashboard Service 啟動成功`);
-  logger.info(`📍 服務地址: http://localhost:${PORT}`);
-  logger.info(`📊 API 文檔: http://localhost:${PORT}/api-docs`);
-  logger.info(`💚 健康檢查: http://localhost:${PORT}/api/v1/health`);
+  logger.info(`🚀 Dashboard Service 啟動成功 on port ${PORT}`);
 });
 
 module.exports = app;

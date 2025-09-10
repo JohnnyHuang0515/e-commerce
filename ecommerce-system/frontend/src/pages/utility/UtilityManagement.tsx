@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Tabs,
@@ -44,6 +44,175 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
+// 表格列定義
+const fileColumns = [
+  {
+    title: '檔案名稱',
+    dataIndex: 'name',
+    key: 'name',
+    render: (text: string, record: FileInfo) => (
+      <Space>
+        <FileOutlined />
+        <span>{text}</span>
+      </Space>
+    ),
+  },
+  {
+    title: '大小',
+    dataIndex: 'size',
+    key: 'size',
+    render: (size: number) => `${(size / 1024 / 1024).toFixed(2)} MB`,
+  },
+  {
+    title: '類型',
+    dataIndex: 'type',
+    key: 'type',
+    render: (type: string) => <Tag color="blue">{type}</Tag>,
+  },
+  {
+    title: '上傳時間',
+    dataIndex: 'uploadTime',
+    key: 'uploadTime',
+    render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss'),
+  },
+  {
+    title: '操作',
+    key: 'action',
+    render: (text: any, record: FileInfo) => (
+      <Space>
+        <Button type="link" icon={<EyeOutlined />} size="small">
+          查看
+        </Button>
+        <Button type="link" icon={<DownloadOutlined />} size="small">
+          下載
+        </Button>
+        <Popconfirm title="確定要刪除這個檔案嗎？" onConfirm={() => {}}>
+          <Button type="link" danger icon={<DeleteOutlined />} size="small">
+            刪除
+          </Button>
+        </Popconfirm>
+      </Space>
+    ),
+  },
+];
+
+const backupColumns = [
+  {
+    title: '備份名稱',
+    dataIndex: 'name',
+    key: 'name',
+    render: (text: string, record: BackupInfo) => (
+      <Space>
+        <DatabaseOutlined />
+        <span>{text}</span>
+      </Space>
+    ),
+  },
+  {
+    title: '類型',
+    dataIndex: 'type',
+    key: 'type',
+    render: (type: string) => <Tag color="green">{type}</Tag>,
+  },
+  {
+    title: '大小',
+    dataIndex: 'size',
+    key: 'size',
+    render: (size: number) => `${(size / 1024 / 1024).toFixed(2)} MB`,
+  },
+  {
+    title: '創建時間',
+    dataIndex: 'createdAt',
+    key: 'createdAt',
+    render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss'),
+  },
+  {
+    title: '狀態',
+    dataIndex: 'status',
+    key: 'status',
+    render: (status: string) => (
+      <Badge 
+        status={status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'processing'} 
+        text={status === 'completed' ? '完成' : status === 'failed' ? '失敗' : '進行中'} 
+      />
+    ),
+  },
+  {
+    title: '操作',
+    key: 'action',
+    render: (text: any, record: BackupInfo) => (
+      <Space>
+        <Button type="link" icon={<CloudDownloadOutlined />} size="small">
+          下載
+        </Button>
+        <Popconfirm title="確定要刪除這個備份嗎？" onConfirm={() => {}}>
+          <Button type="link" danger icon={<DeleteOutlined />} size="small">
+            刪除
+          </Button>
+        </Popconfirm>
+      </Space>
+    ),
+  },
+];
+
+const restoreColumns = [
+  {
+    title: '還原名稱',
+    dataIndex: 'name',
+    key: 'name',
+    render: (text: string, record: RestoreInfo) => (
+      <Space>
+        <CloudUploadOutlined />
+        <span>{text}</span>
+      </Space>
+    ),
+  },
+  {
+    title: '來源備份',
+    dataIndex: 'backupName',
+    key: 'backupName',
+  },
+  {
+    title: '開始時間',
+    dataIndex: 'startTime',
+    key: 'startTime',
+    render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss'),
+  },
+  {
+    title: '結束時間',
+    dataIndex: 'endTime',
+    key: 'endTime',
+    render: (time: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
+  },
+  {
+    title: '狀態',
+    dataIndex: 'status',
+    key: 'status',
+    render: (status: string) => (
+      <Badge 
+        status={status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'processing'} 
+        text={status === 'completed' ? '完成' : status === 'failed' ? '失敗' : '進行中'} 
+      />
+    ),
+  },
+  {
+    title: '操作',
+    key: 'action',
+    render: (text: any, record: RestoreInfo) => (
+      <Space>
+        <Button type="link" icon={<EyeOutlined />} size="small">
+          查看詳情
+        </Button>
+        {record.status === 'failed' && (
+          <Button type="link" icon={<ReloadOutlined />} size="small">
+            重試
+          </Button>
+        )}
+      </Space>
+    ),
+  },
+];
+
 const UtilityManagement: React.FC = () => {
   // 狀態管理
   const [activeTab, setActiveTab] = useState('files');
@@ -76,13 +245,69 @@ const UtilityManagement: React.FC = () => {
   const [backupForm] = Form.useForm();
   const [restoreForm] = Form.useForm();
 
+  const loadFiles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await UtilityService.getFiles({
+        ...fileFilter,
+        page: filePagination.page,
+        limit: filePagination.limit,
+      });
+      
+      if (response.success) {
+        setFiles(response.data.data);
+        setFilePagination(response.data.pagination);
+      }
+    } catch (error) {
+      message.error('載入檔案列表失敗');
+    } finally {
+      setLoading(false);
+    }
+  }, [fileFilter, filePagination]);
+
+  const loadBackups = useCallback(async () => {
+    try {
+      const response = await UtilityService.getBackups({
+        ...backupFilter,
+        page: backupPagination.page,
+        limit: backupPagination.limit,
+      });
+      
+      if (response.success) {
+        setBackups(response.data.data);
+        setBackupPagination(response.data.pagination);
+      }
+    } catch (error) {
+      message.error('載入備份列表失敗');
+    }
+  }, [backupFilter, backupPagination]);
+
+  const loadRestores = useCallback(async () => {
+    try {
+      const response = await UtilityService.getRestores({
+        ...restoreFilter,
+        page: restorePagination.page,
+        limit: restorePagination.limit,
+      });
+      
+      if (response.success) {
+        setRestores(response.data.data);
+        setRestorePagination(response.data.pagination);
+      }
+    } catch (error) {
+      message.error('載入還原列表失敗');
+    }
+  }, [restoreFilter, restorePagination]);
+
+
+
   // 載入數據
   useEffect(() => {
     loadStats();
     loadFiles();
     loadBackups();
     loadRestores();
-  }, []);
+  }, [loadFiles, loadBackups, loadRestores]);
 
   // 載入統計數據
   const loadStats = async () => {
@@ -95,6 +320,8 @@ const UtilityManagement: React.FC = () => {
       console.error('載入統計數據失敗:', error);
     }
   };
+
+
 
   // Tabs items 配置
   const tabItems = [
@@ -220,62 +447,7 @@ const UtilityManagement: React.FC = () => {
     },
   ];
 
-  // 載入檔案列表
-  const loadFiles = async () => {
-    setLoading(true);
-    try {
-      const response = await UtilityService.getFiles({
-        ...fileFilter,
-        page: filePagination.page,
-        limit: filePagination.limit,
-      });
-      
-      if (response.success) {
-        setFiles(response.data.data);
-        setFilePagination(response.data.pagination);
-      }
-    } catch (error) {
-      message.error('載入檔案列表失敗');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // 載入備份列表
-  const loadBackups = async () => {
-    try {
-      const response = await UtilityService.getBackups({
-        ...backupFilter,
-        page: backupPagination.page,
-        limit: backupPagination.limit,
-      });
-      
-      if (response.success) {
-        setBackups(response.data.data);
-        setBackupPagination(response.data.pagination);
-      }
-    } catch (error) {
-      message.error('載入備份列表失敗');
-    }
-  };
-
-  // 載入還原列表
-  const loadRestores = async () => {
-    try {
-      const response = await UtilityService.getRestores({
-        ...restoreFilter,
-        page: restorePagination.page,
-        limit: restorePagination.limit,
-      });
-      
-      if (response.success) {
-        setRestores(response.data.data);
-        setRestorePagination(response.data.pagination);
-      }
-    } catch (error) {
-      message.error('載入還原列表失敗');
-    }
-  };
 
   // 檔案上傳
   const handleUpload = async () => {
@@ -402,188 +574,7 @@ const UtilityManagement: React.FC = () => {
     }
   };
 
-  // 檔案表格列定義
-  const fileColumns = [
-    {
-      title: '檔案名稱',
-      dataIndex: 'originalName',
-      key: 'originalName',
-      render: (text: string, record: FileInfo) => (
-        <Space>
-          <span>{UtilityService.getFileCategoryIcon(record.category)}</span>
-          <span>{text}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '類型',
-      dataIndex: 'category',
-      key: 'category',
-      render: (category: string) => <Tag color="blue">{category}</Tag>,
-    },
-    {
-      title: '大小',
-      dataIndex: 'size',
-      key: 'size',
-      render: (size: number) => UtilityService.formatFileSize(size),
-    },
-    {
-      title: '上傳者',
-      dataIndex: 'uploadedBy',
-      key: 'uploadedBy',
-    },
-    {
-      title: '標籤',
-      dataIndex: 'tags',
-      key: 'tags',
-      render: (tags: string[]) => (
-        <Space>
-          {tags.map(tag => <Tag key={tag}>{tag}</Tag>)}
-        </Space>
-      ),
-    },
-    {
-      title: '下載次數',
-      dataIndex: 'downloadCount',
-      key: 'downloadCount',
-    },
-    {
-      title: '上傳時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      render: (_, record: FileInfo) => (
-        <Space>
-          <Tooltip title="下載">
-            <Button
-              type="text"
-              icon={<DownloadOutlined />}
-              onClick={() => handleDownloadFile(record.id)}
-            />
-          </Tooltip>
-          <Tooltip title="查看">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={() => window.open(record.url, '_blank')}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="確定要刪除這個檔案嗎？"
-            onConfirm={() => handleDeleteFile(record.id)}
-          >
-            <Tooltip title="刪除">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
 
-  // 備份表格列定義
-  const backupColumns = [
-    {
-      title: '備份名稱',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: '類型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: string) => <Tag color="purple">{type}</Tag>,
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Badge
-          status={UtilityService.getStatusColor(status) as any}
-          text={status}
-        />
-      ),
-    },
-    {
-      title: '大小',
-      dataIndex: 'size',
-      key: 'size',
-      render: (size: number) => size ? UtilityService.formatFileSize(size) : '-',
-    },
-    {
-      title: '檔案數量',
-      dataIndex: 'fileCount',
-      key: 'fileCount',
-    },
-    {
-      title: '創建者',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
-    },
-    {
-      title: '完成時間',
-      dataIndex: 'completedAt',
-      key: 'completedAt',
-      render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-',
-    },
-  ];
-
-  // 還原表格列定義
-  const restoreColumns = [
-    {
-      title: '還原名稱',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: '備份ID',
-      dataIndex: 'backupId',
-      key: 'backupId',
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Badge
-          status={UtilityService.getStatusColor(status) as any}
-          text={status}
-        />
-      ),
-    },
-    {
-      title: '創建者',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
-    },
-    {
-      title: '完成時間',
-      dataIndex: 'completedAt',
-      key: 'completedAt',
-      render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-',
-    },
-  ];
 
   return (
     <div style={{ padding: '24px' }}>

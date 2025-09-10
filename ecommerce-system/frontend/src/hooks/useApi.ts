@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardService } from '../services/dashboardService';
 import { ProductService, ProductSearchParams } from '../services/productService';
 import { OrderService, OrderSearchParams } from '../services/orderService';
-import { UserService, UserSearchParams } from '../services/userService';
 import { AuthService } from '../services/authService';
 import { ImageService, ImageSearchParams } from '../services/imageService';
 import { PaymentService, PaymentSearchParams } from '../services/paymentService';
@@ -136,11 +135,11 @@ export const useOrderStats = () => {
   });
 };
 
-// 用戶相關 hooks
+// 用戶相關 hooks (現在由 AuthService 處理)
 export const useUsers = (params?: UserSearchParams) => {
   return useQuery({
     queryKey: ['users', params],
-    queryFn: () => UserService.getUsers(params),
+    queryFn: () => AuthService.getUsers(params),
     staleTime: 2 * 60 * 1000, // 2 分鐘
   });
 };
@@ -148,7 +147,7 @@ export const useUsers = (params?: UserSearchParams) => {
 export const useUser = (userId: string) => {
   return useQuery({
     queryKey: ['users', userId],
-    queryFn: () => UserService.getUser(userId),
+    queryFn: () => AuthService.getUser(userId),
     enabled: !!userId,
   });
 };
@@ -157,7 +156,7 @@ export const useCreateUser = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: UserService.createUser,
+    mutationFn: AuthService.createUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
@@ -168,7 +167,7 @@ export const useUpdateUser = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, ...data }: any) => UserService.updateUser({ id, ...data }),
+    mutationFn: ({ id, ...data }: any) => AuthService.updateUser({ id, ...data }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['users', variables.id] });
@@ -180,7 +179,7 @@ export const useDeleteUser = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: UserService.deleteUser,
+    mutationFn: AuthService.deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
@@ -190,7 +189,7 @@ export const useDeleteUser = () => {
 export const useUserStats = () => {
   return useQuery({
     queryKey: ['users', 'stats'],
-    queryFn: () => UserService.getUserStats(),
+    queryFn: () => AuthService.getUserStats(),
     staleTime: 5 * 60 * 1000, // 5 分鐘
   });
 };

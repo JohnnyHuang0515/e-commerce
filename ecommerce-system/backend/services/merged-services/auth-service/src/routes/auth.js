@@ -1,175 +1,42 @@
 const express = require('express');
-const authController = require('../controllers/authController');
-const { validateAuth } = require('../middleware/validation');
-const { authenticateToken } = require('../middleware/auth');
-
 const router = express.Router();
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     LoginRequest:
- *       type: object
- *       required:
- *         - email
- *         - password
- *       properties:
- *         email:
- *           type: string
- *           format: email
- *           description: 用戶郵箱
- *         password:
- *           type: string
- *           minLength: 6
- *           description: 用戶密碼
- *     LoginResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *         message:
- *           type: string
- *         data:
- *           type: object
- *           properties:
- *             token:
- *               type: string
- *             user:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                 email:
- *                   type: string
- *                 role:
- *                   type: string
- *                 permissions:
- *                   type: array
- *                   items:
- *                     type: string
- */
+const authController = require('../controllers/authController');
+const userController = require('../controllers/userController');
+const permissionController = require('../controllers/permissionController');
 
-/**
- * @swagger
- * /api/v1/auth/login:
- *   post:
- *     summary: 用戶登入
- *     tags: [認證]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/LoginRequest'
- *     responses:
- *       200:
- *         description: 登入成功
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/LoginResponse'
- *       400:
- *         description: 請求參數錯誤
- *       401:
- *         description: 認證失敗
- *       500:
- *         description: 服務器錯誤
- */
-router.post('/login', validateAuth.login, authController.login);
+const { validateAuth, validateUser, validatePermission } = require('../middleware/validation');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
-/**
- * @swagger
- * /api/v1/auth/register:
- *   post:
- *     summary: 用戶註冊
- *     tags: [認證]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - name
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 minLength: 6
- *               name:
- *                 type: string
- *               role:
- *                 type: string
- *                 default: 'user'
- *     responses:
- *       201:
- *         description: 註冊成功
- *       400:
- *         description: 請求參數錯誤
- *       409:
- *         description: 用戶已存在
- *       500:
- *         description: 服務器錯誤
- */
+// --- 👤 User Authentication ---
 router.post('/register', validateAuth.register, authController.register);
-
-/**
- * @swagger
- * /api/v1/auth/refresh:
- *   post:
- *     summary: 刷新 Token
- *     tags: [認證]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Token 刷新成功
- *       401:
- *         description: Token 無效
- *       500:
- *         description: 服務器錯誤
- */
-router.post('/refresh', authenticateToken, authController.refreshToken);
-
-/**
- * @swagger
- * /api/v1/auth/logout:
- *   post:
- *     summary: 用戶登出
- *     tags: [認證]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: 登出成功
- *       401:
- *         description: Token 無效
- *       500:
- *         description: 服務器錯誤
- */
+router.post('/login', validateAuth.login, authController.login);
 router.post('/logout', authenticateToken, authController.logout);
-
-/**
- * @swagger
- * /api/v1/auth/verify:
- *   get:
- *     summary: 驗證 Token
- *     tags: [認證]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Token 有效
- *       401:
- *         description: Token 無效
- *       500:
- *         description: 服務器錯誤
- */
+router.post('/refresh', authenticateToken, authController.refreshToken);
 router.get('/verify', authenticateToken, authController.verifyToken);
+router.get('/profile', authenticateToken, userController.getUserProfile);
+router.put('/profile', authenticateToken, validateUser.updateProfile, userController.updateUserProfile);
+router.put('/change-password', authenticateToken, validateUser.changePassword, userController.changePassword);
+
+// --- 🔑 Permission Management ---
+router.get('/permissions', authenticateToken, authorize(['admin']), permissionController.getPermissions);
+router.post('/permissions', authenticateToken, authorize(['admin']), validatePermission.create, permissionController.createPermission);
+router.get('/permissions/:id', authenticateToken, authorize(['admin']), permissionController.getPermissionById);
+router.put('/permissions/:id', authenticateToken, authorize(['admin']), validatePermission.update, permissionController.updatePermission);
+router.delete('/permissions/:id', authenticateToken, authorize(['admin']), permissionController.deletePermission);
+
+// --- 🎭 Role Management ---
+router.get('/roles', authenticateToken, authorize(['admin']), permissionController.getRoles);
+router.post('/roles', authenticateToken, authorize(['admin']), validatePermission.createRole, permissionController.createRole);
+router.get('/roles/:id', authenticateToken, authorize(['admin']), permissionController.getRoleById);
+router.put('/roles/:id', authenticateToken, authorize(['admin']), validatePermission.updateRole, permissionController.updateRole);
+router.delete('/roles/:id', authenticateToken, authorize(['admin']), permissionController.deleteRole);
+router.post('/roles/:id/permissions', authenticateToken, authorize(['admin']), permissionController.assignPermissionsToRole);
+router.delete('/roles/:id/permissions', authenticateToken, authorize(['admin']), permissionController.removePermissionsFromRole);
+
+// --- 👥 User Role Management ---
+router.get('/users/:userId/roles', authenticateToken, authorize(['admin']), userController.getUserRoles);
+router.post('/users/:userId/roles', authenticateToken, authorize(['admin']), userController.assignRoleToUser);
+router.delete('/users/:userId/roles/:roleId', authenticateToken, authorize(['admin']), userController.removeRoleFromUser);
 
 module.exports = router;

@@ -48,13 +48,12 @@ build-no-cache: ## 建構所有服務 (不使用快取)
 test: ## 運行所有測試
 	@echo "🧪 運行所有測試..."
 	@echo "📁 後端測試..."
-	cd backend/services/product-service && npm test
-	cd backend/services/order-service && npm test
-	cd backend/services/user-service && npm test
+	cd backend/services/merged-services/product-service && npm test
+	cd backend/services/merged-services/order-service && npm test
+	cd backend/services/merged-services/auth-service && npm test
 	@echo "📁 AI 服務測試..."
-	cd backend/services/ai-search-service && python -m pytest
-	cd ai-services/recommendation-service && python -m pytest
-	cd ai-services/analytics-service && python -m pytest
+	cd backend/services/merged-services/ai-service && python -m pytest
+	cd backend/services/merged-services/analytics-service && python -m pytest
 	@echo "📁 前端測試..."
 	cd frontend && npm test
 	@echo "✅ 所有測試已完成"
@@ -77,16 +76,16 @@ test-e2e: ## 運行端到端測試
 # 資料庫相關
 db-migrate: ## 執行資料庫遷移
 	@echo "🗄️ 執行資料庫遷移..."
-	cd backend/services/product-service && npm run migrate
-	cd backend/services/order-service && npm run migrate
-	cd backend/services/user-service && npm run migrate
+	cd backend/services/merged-services/product-service && npm run migrate
+	cd backend/services/merged-services/order-service && npm run migrate
+	cd backend/services/merged-services/auth-service && npm run migrate
 	@echo "✅ 資料庫遷移已完成"
 
 db-seed: ## 執行資料庫種子
 	@echo "🌱 執行資料庫種子..."
-	cd backend/services/product-service && npm run seed
-	cd backend/services/order-service && npm run seed
-	cd backend/services/user-service && npm run seed
+	cd backend/services/merged-services/product-service && npm run seed
+	cd backend/services/merged-services/order-service && npm run seed
+	cd backend/services/merged-services/auth-service && npm run seed
 	@echo "✅ 資料庫種子已完成"
 
 db-reset: ## 重置資料庫
@@ -147,10 +146,6 @@ logs-user: ## 查看用戶服務日誌
 	@echo "📋 查看用戶服務日誌..."
 	docker-compose logs -f user-service
 
-logs-ai-search: ## 查看AI搜尋服務日誌
-	@echo "📋 查看AI搜尋服務日誌..."
-	docker-compose logs -f ai-search-service
-
 logs-log-service: ## 查看日誌服務日誌
 	@echo "📋 查看日誌服務日誌..."
 	docker-compose logs -f log-service
@@ -172,8 +167,6 @@ health: ## 檢查所有服務健康狀態
 	@curl -s http://localhost:3002/api/v1/health || echo "❌ Order Service 無回應"
 	@echo "📊 User Service:"
 	@curl -s http://localhost:3003/api/v1/health || echo "❌ User Service 無回應"
-	@echo "📊 AI Search Service:"
-	@curl -s http://localhost:3014/api/v1/health || echo "❌ AI Search Service 無回應"
 	@echo "📊 Notification Service:"
 	@curl -s http://localhost:3017/api/v1/health || echo "❌ Notification Service 無回應"
 	@echo "📊 Log Service:"
@@ -184,9 +177,9 @@ health: ## 檢查所有服務健康狀態
 # 文檔相關
 docs: ## 生成 API 文檔
 	@echo "📚 生成 API 文檔..."
-	cd backend/services/product-service && npm run docs
-	cd backend/services/order-service && npm run docs
-	cd backend/services/user-service && npm run docs
+	cd backend/services/merged-services/product-service && npm run docs
+	cd backend/services/merged-services/order-service && npm run docs
+	cd backend/services/merged-services/auth-service && npm run docs
 	@echo "✅ API 文檔已生成"
 
 docs-serve: ## 啟動文檔服務器
@@ -221,22 +214,21 @@ restore: ## 還原資料庫
 install: ## 安裝所有依賴
 	@echo "📦 安裝所有依賴..."
 	cd frontend && npm install
-	cd backend/services/product-service && npm install
-	cd backend/services/order-service && npm install
-	cd backend/services/user-service && npm install
-	cd backend/services/payment-service && npm install
-	cd backend/services/ai-search-service && pip install -r requirements.txt
-	cd ai-services/recommendation-service && pip install -r requirements.txt
-	cd ai-services/analytics-service && pip install -r requirements.txt
+	cd backend/services/merged-services/product-service && npm install
+	cd backend/services/merged-services/order-service && npm install
+	cd backend/services/merged-services/auth-service && npm install
+	cd backend/services/merged-services/payment-service && npm install
+	cd backend/services/merged-services/ai-service && pip install -r requirements.txt
+	cd backend/services/merged-services/analytics-service && pip install -r requirements.txt
 	@echo "✅ 所有依賴已安裝"
 
 update: ## 更新所有依賴
 	@echo "🔄 更新所有依賴..."
 	cd frontend && npm update
-	cd backend/services/product-service && npm update
-	cd backend/services/order-service && npm update
-	cd backend/services/user-service && npm update
-	cd backend/services/payment-service && npm update
+	cd backend/services/merged-services/product-service && npm update
+	cd backend/services/merged-services/order-service && npm update
+	cd backend/services/merged-services/auth-service && npm update
+	cd backend/services/merged-services/payment-service && npm update
 	@echo "✅ 所有依賴已更新"
 
 # 快速命令

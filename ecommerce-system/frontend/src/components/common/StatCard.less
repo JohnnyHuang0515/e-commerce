@@ -18,6 +18,11 @@
   }
   
   .stat-card-content {
+    min-height: 120px; // 確保所有卡片有相同的最小高度
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    
     .stat-card-header {
       margin-bottom: @spacing-3;
       
@@ -31,6 +36,7 @@
     
     .stat-card-body {
       margin-bottom: @spacing-4;
+      flex: 1; // 讓數值區域佔據剩餘空間
       
       .ant-statistic {
         .ant-statistic-content {
@@ -42,6 +48,8 @@
     }
     
     .stat-card-footer {
+      min-height: 20px; // 確保趨勢區域有固定高度
+      
       .trend-icon {
         font-size: @font-size-sm;
         

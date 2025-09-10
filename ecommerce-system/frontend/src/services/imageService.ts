@@ -1,4 +1,4 @@
-import { minioApi, ApiResponse, PaginatedResponse } from './api';
+import { imageApi, ApiResponse, PaginatedResponse } from './api';
 
 // 圖片相關類型定義
 export interface Image {
@@ -79,7 +79,7 @@ export class ImageService {
         formData.append('tags', request.tags);
       }
 
-      const response = await minioApi.post('/images', formData, {
+      const response = await imageApi.post('/images', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -115,7 +115,7 @@ export class ImageService {
         formData.append('tags', request.tags);
       }
 
-      const response = await minioApi.post('/images/batch', formData, {
+      const response = await imageApi.post('/images/batch', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -131,7 +131,7 @@ export class ImageService {
   // 獲取圖片列表
   static async getImages(params?: ImageSearchParams): Promise<ApiResponse<PaginatedResponse<Image>>> {
     try {
-      const response = await minioApi.get('/images', { params });
+      const response = await imageApi.get('/images', { params });
       return response.data;
     } catch (error) {
       console.error('獲取圖片列表失敗:', error);
@@ -142,7 +142,7 @@ export class ImageService {
   // 獲取單個圖片
   static async getImage(imageId: string): Promise<ApiResponse<Image>> {
     try {
-      const response = await minioApi.get(`/images/${imageId}`);
+      const response = await imageApi.get(`/images/${imageId}`);
       return response.data;
     } catch (error) {
       console.error('獲取圖片失敗:', error);
@@ -153,7 +153,7 @@ export class ImageService {
   // 刪除圖片
   static async deleteImage(imageId: string): Promise<ApiResponse<void>> {
     try {
-      const response = await minioApi.delete(`/images/${imageId}`);
+      const response = await imageApi.delete(`/images/${imageId}`);
       return response.data;
     } catch (error) {
       console.error('刪除圖片失敗:', error);
@@ -164,7 +164,7 @@ export class ImageService {
   // 獲取圖片統計
   static async getImageStats(): Promise<ApiResponse<ImageStats>> {
     try {
-      const response = await minioApi.get('/images/stats');
+      const response = await imageApi.get('/images/stats');
       return response.data;
     } catch (error) {
       console.error('獲取圖片統計失敗:', error);
@@ -178,7 +178,7 @@ export class ImageService {
     entityId: string
   ): Promise<ApiResponse<Image[]>> {
     try {
-      const response = await minioApi.get('/images', {
+      const response = await imageApi.get('/images', {
         params: { entityType, entityId }
       });
       return response.data;

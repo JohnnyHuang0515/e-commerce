@@ -5,11 +5,31 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-// 資料庫連接
-const { sequelize, testConnection } = require('./config/postgres');
-const { connectMongoDB } = require('./config/mongodb');
+// 資料庫連接 - 簡化版本
+const { Client } = require('pg');
+
+const testPostgresConnection = async () => {
+  try {
+    const client = new Client({
+      host: process.env.DB_HOST || 'postgresql',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'ecommerce_system',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres123',
+    });
+    
+    await client.connect();
+    await client.query('SELECT 1');
+    await client.end();
+    return true;
+  } catch (error) {
+    console.error('PostgreSQL 連接失敗:', error.message);
+    return false;
+  }
+};
+
 
 // 路由
 const authRoutes = require('./routes/auth');
@@ -17,7 +37,7 @@ const userRoutes = require('./routes/user');
 const permissionRoutes = require('./routes/permission');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 // 中間件
 app.use(helmet());
@@ -65,8 +85,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 // 健康檢查
 app.get('/health', async (req, res) => {
   try {
-    const postgresStatus = await testConnection();
-    const mongoStatus = await connectMongoDB();
+    const postgresStatus = await testPostgresConnection();
     
     res.json({
       success: true,
@@ -74,8 +93,31 @@ app.get('/health', async (req, res) => {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       databases: {
-        postgresql: postgresStatus ? 'connected' : 'disconnected',
-        mongodb: mongoStatus ? 'connected' : 'disconnected'
+        postgresql: postgresStatus ? 'connected' : 'disconnected'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      service: 'AUTH Service',
+      status: 'unhealthy',
+      error: error.message
+    });
+  }
+});
+
+// API 健康檢查
+app.get('/api/v1/health', async (req, res) => {
+  try {
+    const postgresStatus = await testPostgresConnection();
+    
+    res.json({
+      success: true,
+      service: 'AUTH Service',
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      databases: {
+        postgresql: postgresStatus ? 'connected' : 'disconnected'
       }
     });
   } catch (error) {
@@ -138,14 +180,10 @@ const initializeDatabases = async () => {
     console.log('🔄 初始化資料庫連接...');
     
     // PostgreSQL 初始化
-    const postgresConnected = await testConnection();
-    
-    // MongoDB 初始化
-    const mongoConnected = await connectMongoDB();
+    const postgresConnected = await testPostgresConnection();
     
     console.log('✅ 資料庫初始化完成');
     console.log(`   - PostgreSQL: ${postgresConnected ? '已連接' : '連接失敗'}`);
-    console.log(`   - MongoDB: ${mongoConnected ? '已連接' : '連接失敗'}`);
     
   } catch (error) {
     console.error('❌ 資料庫初始化失敗:', error);
@@ -203,7 +241,7 @@ process.on('SIGINT', async () => {
   }
 });
 
-// 啟動服務
+// 啟動服務器
 startServer();
 
 module.exports = app;

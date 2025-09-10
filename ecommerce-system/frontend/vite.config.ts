@@ -23,8 +23,7 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
-    // 移除 proxy 配置，改由 Nginx 處理 API 代理
-    // 所有 API 請求將直接發送到 Nginx (localhost:80)
+    // 使用 Nginx 代理，移除 Vite 代理配置
   },
   build: {
     outDir: 'dist',
@@ -39,6 +38,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' }
   },
   css: {
     preprocessorOptions: {

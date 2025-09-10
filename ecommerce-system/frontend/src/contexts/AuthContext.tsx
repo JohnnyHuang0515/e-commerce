@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { message } from 'antd';
+import { App } from 'antd';
 
 interface User {
   _id: string;
@@ -30,6 +30,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { message } = App.useApp();
 
   useEffect(() => {
     // 檢查本地存儲中的認證信息

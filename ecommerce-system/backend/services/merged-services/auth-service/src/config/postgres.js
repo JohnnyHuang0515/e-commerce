@@ -1,4 +1,4 @@
-const { createPostgresConnection } = require('../../../shared-config/postgres');
+const { createPostgresConnection } = require('/app/shared-config/postgres');
 
 // 使用統一的 PostgreSQL 配置
 const { sequelize, testConnection } = createPostgresConnection('AUTH Service');

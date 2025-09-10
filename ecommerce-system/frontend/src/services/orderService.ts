@@ -114,7 +114,7 @@ export class OrderService {
   // 獲取訂單列表
   static async getOrders(params?: OrderSearchParams): Promise<ApiResponse<PaginatedResponse<Order>>> {
     try {
-      const response = await orderApi.get('/orders', { params });
+      const response = await orderApi.get('/api/v1/orders', { params });
       return response.data;
     } catch (error) {
       console.error('獲取訂單列表失敗:', error);
@@ -213,7 +213,7 @@ export class OrderService {
   // 獲取訂單統計
   static async getOrderStats(): Promise<ApiResponse<OrderStats>> {
     try {
-      const response = await orderApi.get('/orders/stats');
+      const response = await orderApi.get('/api/v1/orders/stats');
       return response.data;
     } catch (error) {
       console.error('獲取訂單統計失敗:', error);
@@ -233,7 +233,7 @@ export class OrderService {
     }>;
   }>> {
     try {
-      const response = await orderApi.get('/orders/overview');
+      const response = await orderApi.get('/api/v1/orders/overview');
       return response.data;
     } catch (error) {
       console.error('獲取訂單概覽失敗:', error);
@@ -244,7 +244,7 @@ export class OrderService {
   // 導出訂單
   static async exportOrders(params?: OrderSearchParams): Promise<Blob> {
     try {
-      const response = await orderApi.get('/orders/export', {
+      const response = await orderApi.get('/api/v1/orders/export', {
         params,
         responseType: 'blob'
       });

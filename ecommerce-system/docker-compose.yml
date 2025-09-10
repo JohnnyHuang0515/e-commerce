@@ -5,7 +5,7 @@ services:
   mongodb:
     image: mongo:7.0
     container_name: ecommerce-mongodb
-    restart: unless-stopped
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123
@@ -22,7 +22,7 @@ services:
   postgresql:
     image: postgres:15-alpine
     container_name: ecommerce-postgresql
-    restart: unless-stopped
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     environment:
       POSTGRES_DB: ecommerce_transactions
       POSTGRES_USER: admin
@@ -43,30 +43,11 @@ services:
       timeout: 10s
       retries: 3
 
-  # Product Service
-  product-service:
-    build: ./backend/services/product-service
-    container_name: ecommerce-product-service
-    restart: unless-stopped
-    environment:
-      NODE_ENV: development
-      PORT: 3001
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/ecommerce?authSource=admin
-    ports:
-      - "3001:3001"
-    depends_on:
-      - mongodb
-    networks:
-      - ecommerce-network
-    volumes:
-      - ./backend/services/product-service:/app
-      - /app/node_modules
-
   # Redis 快取
   redis:
     image: redis:7-alpine
     container_name: ecommerce-redis
-    restart: unless-stopped
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     ports:
       - "6379:6379"
     volumes:
@@ -74,155 +55,338 @@ services:
     networks:
       - ecommerce-network
 
-  # AI Search Service
-  ai-search-service:
-    build: ./backend/services/ai-search-service
-    container_name: ecommerce-ai-search-service
-    restart: unless-stopped
+  # Product Service
+  product-service:
+    build: ./backend/services/merged-services/product-service
+    container_name: ecommerce-product-service
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     environment:
-      FLASK_ENV: development
-      DEBUG: "true"
-      HOST: 0.0.0.0
-      PORT: 3014
-      MILVUS_HOST: localhost
+      NODE_ENV: development
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/ecommerce?authSource=admin
+    ports:
+      - "3001:3001"
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/merged-services/product-service:/app
+      - /app/node_modules
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/services/merged-services
+      dockerfile: ./auth-service/Dockerfile
+    container_name: ecommerce-auth-service
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DB_HOST: postgresql
+      DB_PORT: 5432
+      DB_NAME: ecommerce_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      JWT_SECRET: your-jwt-secret-key-here
+      JWT_EXPIRES_IN: 24h
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3002:3002"
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/merged-services/auth-service/logs:/app/logs
+
+  # Dashboard Service
+  dashboard-service:
+    build:
+      context: ./backend/services/merged-services/dashboard-service
+      dockerfile: Dockerfile
+    container_name: ecommerce-dashboard-service
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      DB_HOST: mongodb
+      DB_PORT: 27017
+      DB_NAME: ecommerce_dashboard
+      DB_USER: admin
+      DB_PASSWORD: password123
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3008:3008"
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/merged-services/dashboard-service/logs:/app/logs
+
+  # AI Service
+  ai-service:
+    build: ./backend/services/merged-services/ai-service
+    container_name: ecommerce-ai-service
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      MILVUS_HOST: milvus-standalone
       MILVUS_PORT: 19530
-      MILVUS_COLLECTION_NAME: product_vectors
-      MILVUS_DIMENSION: 384
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ""
-      REDIS_DB: 0
-      REDIS_CACHE_TTL: 3600
-      PRODUCT_SERVICE_URL: http://product-service:3001
-      MODEL_NAME: sentence-transformers/all-MiniLM-L6-v2
-      MODEL_CACHE_DIR: /app/models
-      DEFAULT_SEARCH_LIMIT: 20
-      MAX_SEARCH_LIMIT: 100
-      SIMILARITY_THRESHOLD: 0.7
-      LOG_LEVEL: INFO
-      LOG_FILE: /app/logs/ai-search-service.log
-      BATCH_SIZE: 32
-      MAX_CONCURRENT_REQUESTS: 10
-    ports:
-      - "3014:3014"
-    depends_on:
-      - redis
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/ecommerce-ai?authSource=admin
+    # depends_on: 移除依賴，讓服務獨立啟動
     networks:
       - ecommerce-network
     volumes:
-      - ./backend/services/ai-search-service:/app
-      - ai_search_models:/app/models
-      - ai_search_logs:/app/logs
+      - ./backend/services/merged-services/ai-service/logs:/app/logs
+      - ./backend/services/merged-services/ai-service/models:/app/models
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
 
-  # Log Service
-  log-service:
-    build: ./backend/services/log-service
-    container_name: ecommerce-log-service
-    restart: unless-stopped
+  # Order Service
+  order-service:
+    build: ./backend/services/merged-services/order-service
+    container_name: ecommerce-order-service
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     environment:
-      - PORT=3018
-      - WS_PORT=3020
-      - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/ecommerce_logs
-      - LOG_LEVEL=info
-      - LOG_RETENTION_DAYS=30
-      - SERVICE_NAME=log-service
-      - SERVICE_VERSION=1.0.0
+      NODE_ENV: production
+      PORT: 3003
+      DB_HOST: postgresql
+      DB_PORT: 5432
+      DB_NAME: ecommerce_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/ecommerce?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
-      - "3018:3018"
-      - "3020:3020"
-    depends_on:
-      - mongodb
+      - "3003:3003"
+    # depends_on: 移除依賴，讓服務獨立啟動
     networks:
       - ecommerce-network
     volumes:
-      - ./backend/services/log-service:/app
-      - log_service_logs:/app/logs
+      - ./backend/services/merged-services/order-service/logs:/app/logs
+
+  # System Service
+  system-service:
+    build:
+      context: ./backend/services/merged-services
+      dockerfile: ./system-service/Dockerfile
+    container_name: ecommerce-system-service
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DB_HOST: postgresql
+      DB_PORT: 5432
+      DB_NAME: ecommerce_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      MINIO_ENDPOINT: minio-files
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/merged-services/system-service/logs:/app/logs
+
+  # Analytics Service
+  analytics-service:
+    build: ./backend/services/merged-services/analytics-service
+    container_name: ecommerce-analytics-service
+    ports:
+      - "3006:3006"
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USERNAME: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DATABASE: analytics
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/merged-services/analytics-service/logs:/app/logs
 
   # Notification Service
   notification-service:
-    build: ./backend/services/notification-service
+    build: ./backend/services/merged-services/notification-service
     container_name: ecommerce-notification-service
-    restart: unless-stopped
-    environment:
-      - PORT=3017
-      - SOCKET_PORT=3016
-      - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/ecommerce_notifications
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_SECURE=false
-      - SMTP_USER=your-email@gmail.com
-      - SMTP_PASS=your-app-password
-      - SMTP_FROM=noreply@ecommerce.com
-      - SOCKET_CORS_ORIGIN=http://localhost:3000
-      - LOG_LEVEL=info
-      - LOG_RETENTION_DAYS=30
-      - SERVICE_NAME=notification-service
-      - SERVICE_VERSION=1.0.0
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     ports:
       - "3017:3017"
       - "3016:3016"
-    depends_on:
-      - mongodb
+    # depends_on: 移除依賴，讓服務獨立啟動
     networks:
       - ecommerce-network
     volumes:
-      - ./backend/services/notification-service:/app
+      - ./backend/services/merged-services/notification-service:/app
       - notification_service_logs:/app/logs
+
+  # Log Service
+  log-service:
+    build: ./backend/services/merged-services/log-service
+    container_name: ecommerce-log-service
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    ports:
+      - "3018:3018"
+      - "3020:3020"
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+    volumes:
+      - ./backend/services/merged-services/log-service:/app
+      - log_service_logs:/app/logs
 
   # Utility Service
   utility-service:
-    build: ./backend/services/utility-service
+    build: ./backend/services/merged-services/utility-service
     container_name: ecommerce-utility-service
-    restart: unless-stopped
-    environment:
-      - PORT=3019
-      - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/ecommerce_utility
-      - UPLOAD_DIR=/app/uploads
-      - BACKUP_DIR=/app/backups
-      - MAX_FILE_SIZE=104857600
-      - ALLOWED_FILE_TYPES=jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,csv,txt,zip,rar
-      - MAX_FILES_PER_REQUEST=10
-      - IMAGE_RESIZE_ENABLED=true
-      - IMAGE_QUALITY=80
-      - IMAGE_MAX_WIDTH=1920
-      - IMAGE_MAX_HEIGHT=1080
-      - BACKUP_RETENTION_DAYS=30
-      - LOG_LEVEL=info
-      - LOG_RETENTION_DAYS=30
-      - SERVICE_NAME=utility-service
-      - SERVICE_VERSION=1.0.0
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     ports:
       - "3019:3019"
-    depends_on:
-      - mongodb
+    # depends_on: 移除依賴，讓服務獨立啟動
     networks:
       - ecommerce-network
     volumes:
-      - ./backend/services/utility-service:/app
+      - ./backend/services/merged-services/utility-service:/app
       - utility_service_logs:/app/logs
-      - utility_uploads:/app/uploads
-      - utility_backups:/app/backups
 
-  # MongoDB Express (可選的管理介面)
+  # Milvus
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: milvus-etcd
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    environment:
+      - ETCDCTL_API=3
+      - ETCDCTL_ENDPOINTS=http://milvus-etcd:2379
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd
+      - --data-dir=/etcd
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://milvus-etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://milvus-etcd:2380
+      - --initial-cluster=etcd=http://milvus-etcd:2380
+      - --initial-cluster-token=etcd-cluster-1
+      - --initial-cluster-state=new
+    volumes:
+      - milvus_etcd_data:/etcd
+    networks:
+      - ecommerce-network
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: milvus-minio
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    command: server /minio_data --console-address ":9001"
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9003:9001"
+      - "9004:9000"
+    volumes:
+      - milvus_minio_data:/minio_data
+    networks:
+      - ecommerce-network
+
+  milvus-standalone:
+    image: milvusdb/milvus:v2.3.0
+    container_name: milvus-standalone
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    # depends_on: 移除依賴，讓服務獨立啟動
+    networks:
+      - ecommerce-network
+
+  # ClickHouse
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8-alpine
+    container_name: ecommerce-clickhouse
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    ports:
+      - "8123:8123"
+      - "9005:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./scripts/clickhouse-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - ecommerce-network
+
+  # MinIO
+  minio-files:
+    image: minio/minio:latest
+    container_name: ecommerce-minio-files
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - minio_files_data:/data
+    networks:
+      - ecommerce-network
+
+  # MongoDB Express
   mongo-express:
     image: mongo-express:1.0.0
     container_name: ecommerce-mongo-express
-    restart: unless-stopped
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: admin
       ME_CONFIG_MONGODB_ADMINPASSWORD: password123
       ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: password123
     ports:
       - "8081:8081"
-    depends_on:
-      - mongodb
+    # depends_on: 移除依賴，讓服務獨立啟動
     networks:
       - ecommerce-network
+
+  # Nginx API Gateway
+  nginx:
+    image: nginx:alpine
+    container_name: ecommerce-nginx
+    # restart: unless-stopped  # 暫時禁用重啟，避免循環
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./logs:/var/log/nginx
+    # depends_on: 移除依賴，讓服務獨立啟動
+    depends_on:
+      - auth-service
+      - product-service
+      - ai-service
+      - order-service
+      - system-service
+      - analytics-service
+      - dashboard-service
+    networks:
+      - ecommerce-network
+
 
 volumes:
   mongodb_data:
@@ -233,8 +397,11 @@ volumes:
   log_service_logs:
   notification_service_logs:
   utility_service_logs:
-  utility_uploads:
-  utility_backups:
+  milvus_etcd_data:
+  milvus_minio_data:
+  milvus_data:
+  clickhouse_data:
+  minio_files_data:
 
 networks:
   ecommerce-network:
