@@ -15,7 +15,7 @@ COPY auth-service/package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # 複製共享配置和應用程式代碼
-COPY shared-config ./shared-config
+COPY ./shared-config ./shared-config
 COPY auth-service/ .
 
 # 創建必要的目錄

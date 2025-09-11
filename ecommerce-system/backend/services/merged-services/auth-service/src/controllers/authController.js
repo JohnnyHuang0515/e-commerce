@@ -15,33 +15,13 @@ const login = async (req, res) => {
 
     // 查找用戶
     const user = await User.findOne({
-      where: { email },
-      include: [
-        {
-          model: Role,
-          as: 'userRole',
-          include: [
-            {
-              model: Permission,
-              as: 'permissions'
-            }
-          ]
-        }
-      ]
+      where: { email }
     });
 
     if (!user) {
       return res.status(401).json({
         success: false,
         message: '郵箱或密碼錯誤'
-      });
-    }
-
-    // 檢查用戶狀態
-    if (user.status !== 'active') {
-      return res.status(401).json({
-        success: false,
-        message: '用戶帳號已被停用'
       });
     }
 
@@ -54,12 +34,12 @@ const login = async (req, res) => {
       });
     }
 
-    // 生成 JWT Token
+    // 生成 JWT token
     const token = jwt.sign(
       { 
         userId: user.id, 
-        email: user.email, 
-        role: user.userRole?.name || user.role 
+        email: user.email,
+        role: user.role
       },
       process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-development',
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
@@ -68,19 +48,20 @@ const login = async (req, res) => {
     // 更新最後登入時間
     await user.update({ last_login_at: new Date() });
 
-    res.json({
+    return res.json({
       success: true,
-      message: '登入成功',
       data: {
         token,
         user: {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.userRole?.name || user.role,
-          permissions: user.userRole?.permissions?.map(p => p.name) || []
-        }
-      }
+          role: user.role,
+          permissions: user.Roles ? user.Roles.map(role => role.name) : []
+        },
+        expiresIn: 86400 // 24 hours
+      },
+      message: '登入成功'
     });
   } catch (error) {
     console.error('登入錯誤:', error);

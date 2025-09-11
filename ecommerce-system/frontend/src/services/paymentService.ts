@@ -60,43 +60,43 @@ export interface PaymentSearchParams {
 export class PaymentService {
   // 獲取支付列表
   static async getPayments(params?: PaymentSearchParams): Promise<ApiResponse<PaginatedResponse<Payment>>> {
-    const response = await paymentApi.get('/payments', { params });
+    const response = await paymentApi.get('/v1/payments', { params });
     return response.data;
   }
 
   // 獲取支付詳情
   static async getPayment(paymentId: string): Promise<ApiResponse<Payment>> {
-    const response = await paymentApi.get(`/payments/${paymentId}`);
+    const response = await paymentApi.get(`/v1/payments/${paymentId}`);
     return response.data;
   }
 
   // 創建支付
   static async createPayment(data: PaymentCreateRequest): Promise<ApiResponse<Payment>> {
-    const response = await paymentApi.post('/payments', data);
+    const response = await paymentApi.post('/v1/payments', data);
     return response.data;
   }
 
   // 確認支付
   static async confirmPayment(paymentId: string, data: PaymentConfirmRequest): Promise<ApiResponse<Payment>> {
-      const response = await paymentApi.post(`/payments/${paymentId}/confirm`, data);
+      const response = await paymentApi.post(`/v1/payments/${paymentId}/confirm`, data);
       return response.data;
   }
 
   // 取消支付
   static async cancelPayment(paymentId: string): Promise<ApiResponse<Payment>> {
-      const response = await paymentApi.post(`/payments/${paymentId}/cancel`);
+      const response = await paymentApi.post(`/v1/payments/${paymentId}/cancel`);
       return response.data;
   }
 
   // 退款
   static async refundPayment(paymentId: string, data: RefundRequest): Promise<ApiResponse<Payment>> {
-    const response = await paymentApi.post(`/payments/${paymentId}/refund`, data);
+    const response = await paymentApi.post(`/v1/payments/${paymentId}/refund`, data);
     return response.data;
   }
 
   // Webhook 處理 (通常由後端調用，前端可能不需要直接使用)
   static async handleWebhook(provider: string, payload: any): Promise<ApiResponse<any>> {
-      const response = await paymentApi.post(`/payments/webhook/${provider}`, payload);
+      const response = await paymentApi.post(`/v1/payments/webhook/${provider}`, payload);
       return response.data;
   }
 }

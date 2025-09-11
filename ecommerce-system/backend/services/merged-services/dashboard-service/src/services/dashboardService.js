@@ -13,7 +13,7 @@ const SERVICES = {
 
 // HTTP 客戶端配置
 const httpClient = axios.create({
-  timeout: 5000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
   }

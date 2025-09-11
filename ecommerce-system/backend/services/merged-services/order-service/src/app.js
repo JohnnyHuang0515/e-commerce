@@ -14,11 +14,11 @@ const { Client } = require('pg');
 const testPostgresConnection = async () => {
   try {
     const client = new Client({
-      host: process.env.DB_HOST || 'postgresql',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'ecommerce_system',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres123',
+      host: process.env.POSTGRES_HOST || 'postgresql',
+      port: process.env.POSTGRES_PORT || 5432,
+      database: process.env.POSTGRES_DB || 'ecommerce_transactions',
+      user: process.env.POSTGRES_USER || 'admin',
+      password: process.env.POSTGRES_PASSWORD || 'password123',
     });
     
     await client.connect();
@@ -41,10 +41,10 @@ const testMongoConnection = async () => {
   }
 };
 
-// 路由 - 暫時註釋掉複雜路由
-// const orderRoutes = require('./routes/order');
-// const paymentRoutes = require('./routes/payment');
-// const logisticsRoutes = require('./routes/logistics');
+// 路由
+const orderRoutes = require('./routes/order');
+const paymentRoutes = require('./routes/payment');
+const logisticsRoutes = require('./routes/logistics');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -144,10 +144,10 @@ app.get('/api/v1/health', async (req, res) => {
   }
 });
 
-// API 路由 - 暫時註釋掉複雜路由
-// app.use('/api/v1/orders', orderRoutes);
-// app.use('/api/v1/payments', paymentRoutes);
-// app.use('/api/v1/logistics', logisticsRoutes);
+// API 路由
+app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/logistics', logisticsRoutes);
 
 // 簡單的 API 端點
 app.get('/api/v1/orders', (req, res) => {

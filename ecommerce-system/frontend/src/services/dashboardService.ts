@@ -148,7 +148,7 @@ export class DashboardService {
   // 獲取概覽數據
   static async getOverview(period: string = 'month'): Promise<ApiResponse<OverviewData>> {
     try {
-      const response = await dashboardApi.get('/overview', { params: { period } });
+      const response = await dashboardApi.get('/v1/dashboard/overview', { params: { period } });
       return response.data;
     } catch (error) {
       console.error('獲取概覽數據失敗:', error);
@@ -159,7 +159,7 @@ export class DashboardService {
   // 獲取詳細統計
   static async getStats(params?: { metrics: string }): Promise<ApiResponse<DashboardStats>> {
     try {
-        const response = await dashboardApi.get('/stats', { params });
+        const response = await dashboardApi.get('/v1/dashboard/stats', { params });
         return response.data;
     } catch (error) {
         console.error('獲取詳細統計失敗:', error);
@@ -170,7 +170,7 @@ export class DashboardService {
   // 獲取摘要資料
   static async getSummary(): Promise<ApiResponse<any>> {
       try {
-          const response = await dashboardApi.get('/summary');
+          const response = await dashboardApi.get('/v1/dashboard/summary');
           return response.data;
       } catch (error) {
           console.error('獲取摘要資料失敗:', error);
@@ -181,7 +181,7 @@ export class DashboardService {
   // 獲取實時數據
   static async getRealtime(): Promise<ApiResponse<RealtimeData>> {
     try {
-      const response = await dashboardApi.get('/realtime');
+      const response = await dashboardApi.get('/v1/dashboard/realtime');
       return response.data;
     } catch (error) {
       console.error('獲取實時數據失敗:', error);
@@ -192,7 +192,7 @@ export class DashboardService {
   // 獲取關鍵指標
   static async getMetrics(): Promise<ApiResponse<any>> {
       try {
-          const response = await dashboardApi.get('/metrics');
+          const response = await dashboardApi.get('/v1/dashboard/metrics');
           return response.data;
       } catch (error) {
           console.error('獲取關鍵指標失敗:', error);
@@ -203,7 +203,7 @@ export class DashboardService {
   // 獲取趨勢資料
   static async getTrends(): Promise<ApiResponse<any>> {
       try {
-          const response = await dashboardApi.get('/trends');
+          const response = await dashboardApi.get('/v1/dashboard/trends');
           return response.data;
       } catch (error) {
           console.error('獲取趨勢資料失敗:', error);
@@ -214,7 +214,7 @@ export class DashboardService {
   // 警告系統
   static async getAlerts(params?: { type?: string, severity?: string, status?: string }): Promise<ApiResponse<PaginatedResponse<Alert>>> {
       try {
-          const response = await dashboardApi.get('/alerts', { params });
+          const response = await dashboardApi.get('/v1/dashboard/alerts', { params });
           return response.data;
       } catch (error) {
           console.error('獲取警告列表失敗:', error);
@@ -224,7 +224,7 @@ export class DashboardService {
 
   static async createAlert(alertData: Omit<Alert, '_id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Alert>> {
       try {
-          const response = await dashboardApi.post('/alerts', alertData);
+          const response = await dashboardApi.post('/v1/dashboard/alerts', alertData);
           return response.data;
       } catch (error) {
           console.error('建立新警告失敗:', error);
@@ -270,7 +270,7 @@ export class DashboardService {
       if (period) {
         params.period = period;
       }
-      const response = await dashboardApi.get('/analytics', { params });
+      const response = await dashboardApi.get('/v1/dashboard/analytics', { params });
       return response.data;
     } catch (error) {
       console.error('獲取分析數據失敗:', error);
@@ -281,7 +281,7 @@ export class DashboardService {
   // 獲取系統設定
   static async getSettings(): Promise<ApiResponse<any>> {
     try {
-      const response = await dashboardApi.get('/settings');
+      const response = await dashboardApi.get('/v1/dashboard/settings');
       return response.data;
     } catch (error) {
       console.error('獲取系統設定失敗:', error);
@@ -292,7 +292,7 @@ export class DashboardService {
   // 小工具管理
   static async getWidgets(): Promise<ApiResponse<Widget[]>> {
     try {
-      const response = await dashboardApi.get('/widgets');
+      const response = await dashboardApi.get('/v1/dashboard/widgets');
       return response.data;
     } catch (error) {
       console.error('獲取小工具數據失敗:', error);
@@ -302,7 +302,7 @@ export class DashboardService {
 
   static async createWidget(widgetData: Omit<Widget, '_id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Widget>> {
       try {
-          const response = await dashboardApi.post('/widgets', widgetData);
+          const response = await dashboardApi.post('/v1/dashboard/widgets', widgetData);
           return response.data;
       } catch (error) {
           console.error('建立新小工具失敗:', error);
@@ -344,7 +344,7 @@ export class DashboardService {
   // 報告管理
   static async getReports(params?: any): Promise<ApiResponse<PaginatedResponse<ReportData>>> {
       try {
-          const response = await dashboardApi.get('/reports', { params });
+          const response = await dashboardApi.get('/v1/dashboard/reports', { params });
           return response.data;
       } catch (error) {
           console.error('獲取報告列表失敗:', error);
@@ -358,7 +358,7 @@ export class DashboardService {
     parameters: Record<string, any>;
   }): Promise<ApiResponse<ReportData>> {
     try {
-      const response = await dashboardApi.post('/reports/generate', data);
+      const response = await dashboardApi.post('/v1/dashboard/reports/generate', data);
       return response.data;
     } catch (error) {
       console.error('創建報告失敗:', error);
@@ -379,7 +379,7 @@ export class DashboardService {
   // 獲取系統健康狀態
   static async getSystemHealth(): Promise<ApiResponse<any>> {
     try {
-      const response = await dashboardApi.get('/health');
+      const response = await dashboardApi.get('/v1/dashboard/health');
       return response.data;
     } catch (error) {
       console.error('獲取系統健康狀態失敗:', error);

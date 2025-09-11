@@ -7,22 +7,11 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-// 資料庫連接 - 簡化版本
-const { Client } = require('pg');
+const { sequelize } = require('./models');
 
 const testPostgresConnection = async () => {
   try {
-    const client = new Client({
-      host: process.env.DB_HOST || 'postgresql',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'ecommerce_system',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres123',
-    });
-    
-    await client.connect();
-    await client.query('SELECT 1');
-    await client.end();
+    await sequelize.authenticate();
     return true;
   } catch (error) {
     console.error('PostgreSQL 連接失敗:', error.message);

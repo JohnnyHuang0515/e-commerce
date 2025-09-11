@@ -8,6 +8,9 @@ import { PaymentService, PaymentSearchParams } from '../services/paymentService'
 import { LogisticsService, LogisticsSearchParams } from '../services/logisticsService';
 import { InventoryService, InventorySearchParams } from '../services/inventoryService';
 import { PermissionService, PermissionSearchParams, RoleSearchParams, UserRoleSearchParams } from '../services/permissionService';
+import { NotificationService, NotificationSearchParams } from '../services/notificationService';
+import { LogService, LogQueryParams } from '../services/logService';
+import { UtilityService } from '../services/utilityService';
 
 // Dashboard 相關 hooks
 export const useDashboardOverview = () => {
@@ -802,6 +805,162 @@ export const useInitializeDefaultData = () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['user-roles'] });
     },
+  });
+};
+
+// 通知相關 hooks
+export const useNotifications = (params?: NotificationSearchParams) => {
+  return useQuery({
+    queryKey: ['notifications', params],
+    queryFn: () => NotificationService.getNotifications(params),
+    staleTime: 2 * 60 * 1000, // 2 分鐘
+  });
+};
+
+export const useNotification = (notificationId: string) => {
+  return useQuery({
+    queryKey: ['notifications', notificationId],
+    queryFn: () => NotificationService.getNotification(notificationId),
+    enabled: !!notificationId,
+    staleTime: 2 * 60 * 1000, // 2 分鐘
+  });
+};
+
+export const useCreateNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: NotificationService.createNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useUpdateNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; [key: string]: any }) => 
+      NotificationService.updateNotification(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', id] });
+    },
+  });
+};
+
+export const useDeleteNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: NotificationService.deleteNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useSendNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: NotificationService.sendNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useNotificationTemplates = () => {
+  return useQuery({
+    queryKey: ['notification-templates'],
+    queryFn: () => NotificationService.getTemplates(),
+    staleTime: 10 * 60 * 1000, // 10 分鐘
+  });
+};
+
+export const useNotificationStats = () => {
+  return useQuery({
+    queryKey: ['notifications', 'stats'],
+    queryFn: () => NotificationService.getNotificationStats(),
+    staleTime: 5 * 60 * 1000, // 5 分鐘
+  });
+};
+
+// 日誌相關 hooks
+export const useLogs = (params?: LogQueryParams) => {
+  return useQuery({
+    queryKey: ['logs', params],
+    queryFn: () => LogService.getLogs(params),
+    staleTime: 1 * 60 * 1000, // 1 分鐘
+  });
+};
+
+export const useLogStats = () => {
+  return useQuery({
+    queryKey: ['logs', 'stats'],
+    queryFn: () => LogService.getLogStats(),
+    staleTime: 5 * 60 * 1000, // 5 分鐘
+  });
+};
+
+export const useCreateLog = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: LogService.createLog,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
+};
+
+export const useExportLogs = () => {
+  return useMutation({
+    mutationFn: LogService.exportLogs,
+  });
+};
+
+// 工具服務相關 hooks
+export const useUploadFile = () => {
+  return useMutation({
+    mutationFn: UtilityService.uploadFile,
+  });
+};
+
+export const useGetFiles = () => {
+  return useQuery({
+    queryKey: ['utility', 'files'],
+    queryFn: () => UtilityService.getFiles(),
+    staleTime: 5 * 60 * 1000, // 5 分鐘
+  });
+};
+
+export const useCreateBackup = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: UtilityService.createBackup,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['utility', 'backups'] });
+    },
+  });
+};
+
+export const useGetBackups = () => {
+  return useQuery({
+    queryKey: ['utility', 'backups'],
+    queryFn: () => UtilityService.getBackups(),
+    staleTime: 5 * 60 * 1000, // 5 分鐘
+  });
+};
+
+export const useSystemStats = () => {
+  return useQuery({
+    queryKey: ['utility', 'system-stats'],
+    queryFn: () => UtilityService.getSystemStats(),
+    staleTime: 2 * 60 * 1000, // 2 分鐘
   });
 };
 

@@ -23,7 +23,13 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
-    // 使用 Nginx 代理，移除 Vite 代理配置
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   build: {
     outDir: 'dist',

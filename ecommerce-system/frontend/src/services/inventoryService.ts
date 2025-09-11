@@ -88,67 +88,67 @@ export interface InventorySearchParams {
 export class InventoryService {
   // 獲取庫存列表
   static async getInventories(params?: InventorySearchParams): Promise<ApiResponse<PaginatedResponse<Inventory>>> {
-    const response = await inventoryApi.get('/', { params });
+    const response = await inventoryApi.get('/v1/inventory', { params });
     return response.data;
   }
 
   // 獲取庫存詳情
   static async getInventory(productId: string): Promise<ApiResponse<Inventory>> {
-    const response = await inventoryApi.get(`/${productId}`);
+    const response = await inventoryApi.get(`/v1/inventory/${productId}`);
     return response.data;
   }
 
   // 創建庫存
   static async createInventory(data: InventoryCreateRequest): Promise<ApiResponse<Inventory>> {
-    const response = await inventoryApi.post('/', data);
+    const response = await inventoryApi.post('/v1/inventory', data);
     return response.data;
   }
 
   // 更新庫存
   static async updateInventory(productId: string, data: InventoryUpdateRequest): Promise<ApiResponse<Inventory>> {
-    const response = await inventoryApi.put(`/${productId}`, data);
+    const response = await inventoryApi.put(`/v1/inventory/${productId}`, data);
     return response.data;
   }
 
   // 批量更新庫存
   static async bulkUpdateInventory(updates: Array<{ productId: string; quantity: number; type: string; reason: string; referenceId?: string }>): Promise<ApiResponse<any>> {
-      const response = await inventoryApi.post('/bulk', { updates });
+      const response = await inventoryApi.post('/v1/inventory/bulk', { updates });
       return response.data;
   }
 
   // 預留庫存
   static async reserveStock(productId: string, data: StockReservationRequest): Promise<ApiResponse<any>> {
-    const response = await inventoryApi.post(`/${productId}/reserve`, data);
+    const response = await inventoryApi.post(`/v1/inventory/${productId}/reserve`, data);
     return response.data;
   }
 
   // 釋放庫存
   static async releaseStock(productId: string, data: { quantity: number; orderId: string }): Promise<ApiResponse<any>> {
-    const response = await inventoryApi.post(`/${productId}/release`, data);
+    const response = await inventoryApi.post(`/v1/inventory/${productId}/release`, data);
     return response.data;
   }
 
   // 確認出庫
   static async shipStock(productId: string, data: { quantity: number; orderId: string }): Promise<ApiResponse<any>> {
-      const response = await inventoryApi.post(`/${productId}/ship`, data);
+      const response = await inventoryApi.post(`/v1/inventory/${productId}/ship`, data);
       return response.data;
   }
 
   // 獲取庫存交易記錄
   static async getInventoryTransactions(productId: string, params?: { page?: number; limit?: number; type?: string }): Promise<ApiResponse<PaginatedResponse<InventoryTransaction>>> {
-    const response = await inventoryApi.get(`/${productId}/transactions`, { params });
+    const response = await inventoryApi.get(`/v1/inventory/${productId}/transactions`, { params });
     return response.data;
   }
 
   // 獲取庫存統計
   static async getInventoryStats(params?: { period?: string; startDate?: string; endDate?: string }): Promise<ApiResponse<InventoryStats>> {
-    const response = await inventoryApi.get('/stats', { params });
+    const response = await inventoryApi.get('/v1/inventory/stats', { params });
     return response.data;
   }
 
   // 獲取低庫存警告
   static async getLowStockAlerts(params?: { threshold?: number }): Promise<ApiResponse<any>> {
-    const response = await inventoryApi.get('/alerts', { params });
+    const response = await inventoryApi.get('/v1/inventory/alerts', { params });
     return response.data;
   }
 }

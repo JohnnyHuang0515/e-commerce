@@ -138,7 +138,7 @@ export class AnalyticsService {
     // 健康檢查
     static async healthCheck(): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/health');
+            const response = await analyticsApi.get('/v1/health');
             return response.data;
         } catch (error) {
             console.error('Analytics service health check failed:', error);
@@ -149,7 +149,7 @@ export class AnalyticsService {
     // 銷售分析
     static async getSalesAnalytics(params: AnalyticsParams): Promise<ApiResponse<SalesAnalytics>> {
         try {
-            const response = await analyticsApi.get('/sales', { params });
+            const response = await analyticsApi.get('/v1/sales', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get sales analytics:', error);
@@ -159,7 +159,7 @@ export class AnalyticsService {
 
     static async getSalesTrend(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/sales/trend', { params });
+            const response = await analyticsApi.get('/v1/sales/trend', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get sales trend:', error);
@@ -169,7 +169,7 @@ export class AnalyticsService {
 
     static async getSalesComparison(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/sales/comparison', { params });
+            const response = await analyticsApi.get('/v1/sales/comparison', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get sales comparison:', error);
@@ -180,7 +180,7 @@ export class AnalyticsService {
     // 用戶分析
     static async getUserAnalytics(params: AnalyticsParams): Promise<ApiResponse<UserAnalytics>> {
         try {
-            const response = await analyticsApi.get('/users', { params });
+            const response = await analyticsApi.get('/v1/users', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get user analytics:', error);
@@ -190,7 +190,7 @@ export class AnalyticsService {
 
     static async getUserBehavior(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/users/behavior', { params });
+            const response = await analyticsApi.get('/v1/users/behavior', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get user behavior:', error);
@@ -200,7 +200,7 @@ export class AnalyticsService {
 
     static async getUserSegmentation(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/users/segmentation', { params });
+            const response = await analyticsApi.get('/v1/users/segmentation', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get user segmentation:', error);
@@ -211,7 +211,7 @@ export class AnalyticsService {
     // 商品分析
     static async getProductAnalytics(params: AnalyticsParams): Promise<ApiResponse<ProductAnalytics>> {
         try {
-            const response = await analyticsApi.get('/products', { params });
+            const response = await analyticsApi.get('/v1/products', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get product analytics:', error);
@@ -221,7 +221,7 @@ export class AnalyticsService {
 
     static async getProductPerformance(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/products/performance', { params });
+            const response = await analyticsApi.get('/v1/products/performance', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get product performance:', error);
@@ -231,7 +231,7 @@ export class AnalyticsService {
 
     static async getCategoryAnalytics(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/categories', { params });
+            const response = await analyticsApi.get('/v1/categories', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get category analytics:', error);
@@ -242,7 +242,7 @@ export class AnalyticsService {
     // 營收分析
     static async getRevenueAnalytics(params: AnalyticsParams): Promise<ApiResponse<RevenueAnalytics>> {
         try {
-            const response = await analyticsApi.get('/revenue', { params });
+            const response = await analyticsApi.get('/v1/revenue', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get revenue analytics:', error);
@@ -252,7 +252,7 @@ export class AnalyticsService {
 
     static async getRevenueForecast(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/revenue/forecast', { params });
+            const response = await analyticsApi.get('/v1/revenue/forecast', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get revenue forecast:', error);
@@ -262,7 +262,7 @@ export class AnalyticsService {
 
     static async getProfitAnalytics(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/profit', { params });
+            const response = await analyticsApi.get('/v1/profit', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get profit analytics:', error);
@@ -273,7 +273,7 @@ export class AnalyticsService {
     // 綜合分析
     static async getDashboardData(): Promise<ApiResponse<AnalyticsDashboardData>> {
         try {
-            const response = await analyticsApi.get('/dashboard');
+            const response = await analyticsApi.get('/v1/dashboard');
             return response.data;
         } catch (error) {
             console.error('Failed to get analytics dashboard data:', error);
@@ -283,7 +283,7 @@ export class AnalyticsService {
 
     static async getKpi(): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/kpi');
+            const response = await analyticsApi.get('/v1/kpi');
             return response.data;
         } catch (error) {
             console.error('Failed to get KPI data:', error);
@@ -293,7 +293,7 @@ export class AnalyticsService {
 
     static async getReports(params: AnalyticsParams): Promise<ApiResponse<any>> {
         try {
-            const response = await analyticsApi.get('/reports', { params });
+            const response = await analyticsApi.get('/v1/reports', { params });
             return response.data;
         } catch (error) {
             console.error('Failed to get reports:', error);

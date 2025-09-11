@@ -1,25 +1,25 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // API 基礎配置 - 通過 Nginx 代理連接到後端服務
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = '/api';
 const API_TIMEOUT = 10000;
 
 // 統一 API 路徑配置
 const API_PATHS = {
-  AUTH: '/api/v1/auth',
-  USERS: '/api/v1/users',
-  PRODUCTS: '/api/v1/products',
-  CATEGORIES: '/api/v1/products/categories',
-  BRANDS: '/api/v1/products/brands',
-  ORDERS: '/api/v1/orders',
-  AI: '/api/v1/ai',
-  SYSTEM: '/api/v1/system',
-  ANALYTICS: '/api/v1/analytics',
-  DASHBOARD: '/api/v1/dashboard',
-  INVENTORY: '/api/v1/inventory',
-  LOGS: '/api/v1/logs',
-  NOTIFICATIONS: '/api/v1/notifications',
-  UTILITY: '/api/v1/utility',
+  AUTH: '/v1/auth',
+  USERS: '/v1/users',
+  PRODUCTS: '/v1/products',
+  CATEGORIES: '/v1/products/categories',
+  BRANDS: '/v1/products/brands',
+  ORDERS: '/v1/orders',
+  AI: '/v1/ai',
+  SYSTEM: '/v1/system',
+  ANALYTICS: '/v1/analytics',
+  DASHBOARD: '/v1/dashboard',
+  INVENTORY: '/v1/inventory',
+  LOGS: '/v1/logs',
+  NOTIFICATIONS: '/v1/notifications',
+  UTILITY: '/v1/utility',
 } as const;
 
 // 創建 API 實例
@@ -59,6 +59,7 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
       console.error('❌ Response Error:', error.response?.status, error.response?.data);
       if (error.response?.status === 401) {
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
         window.location.href = '/login';
       }
       return Promise.reject(error);
@@ -86,7 +87,7 @@ export const userApi = createApiInstance(API_BASE_URL); // Base path is /api/v1/
 
 // 兼容舊版 Service 的別名
 export const permissionApi = authApi; // Permission management is in auth service
-export const paymentApi = orderApi; // Payment is in order service
+export const paymentApi = createApiInstance(API_BASE_URL); // Payment service has its own API instance
 export const logisticsApi = orderApi; // Logistics is in order service
 export const imageApi = productApi; // Image upload is in product service
 

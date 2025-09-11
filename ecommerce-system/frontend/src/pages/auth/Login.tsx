@@ -11,6 +11,7 @@ import {
   Row,
   Col,
 } from 'antd';
+import { AuthService } from '../../services/authService';
 import {
   UserOutlined,
   LockOutlined,
@@ -36,27 +37,28 @@ const Login: React.FC = () => {
   const handleLogin = async (values: { username: string; password: string }) => {
     setLoading(true);
     try {
-      // 模擬登入 API 調用
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 使用真實的 API 登入
+      const response = await AuthService.login({ 
+        email: values.username, 
+        password: values.password 
+      });
       
-      // 模擬登入成功
-      if (values.username === 'admin' && values.password === 'admin123') {
-        const mockUser = {
-          _id: '1',
-          username: 'admin',
-          email: 'admin@example.com',
-          role: '系統管理員',
-          permissions: ['read', 'write', 'admin'],
+      if (response.success && response.data) {
+        const userData = {
+          _id: response.data.user.id,
+          username: response.data.user.name,
+          email: response.data.user.email,
+          role: response.data.user.role,
+          permissions: response.data.user.permissions || []
         };
         
-        const mockToken = 'mock-jwt-token-' + Date.now();
-        
-        login(mockToken, mockUser);
+        login(response.data.token, userData);
         navigate(from, { replace: true });
       } else {
-        message.error('用戶名或密碼錯誤');
+        message.error('登入失敗，請檢查用戶名和密碼');
       }
     } catch (error: any) {
+      console.error('登入錯誤:', error);
       message.error('登入失敗，請檢查網路連接');
     } finally {
       setLoading(false);
@@ -65,8 +67,8 @@ const Login: React.FC = () => {
 
   const handleDemoLogin = () => {
     form.setFieldsValue({
-      username: 'admin',
-      password: 'admin123',
+      username: 'admin@example.com',
+      password: 'Admin123',
     });
   };
 
@@ -154,7 +156,7 @@ const Login: React.FC = () => {
                   </Button>
                   <div className="demo-info">
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                      演示帳號: admin / admin123
+                      演示帳號: admin@example.com / Admin123
                     </Text>
                   </div>
                 </div>

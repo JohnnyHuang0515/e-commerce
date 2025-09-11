@@ -37,6 +37,18 @@ const validateOrder = {
       .isLength({ max: 500 })
       .withMessage('備註不能超過500個字符'),
     handleValidationErrors
+  ],
+  update: [
+    body('status')
+      .optional()
+      .isString()
+      .withMessage('狀態必須是字符串'),
+    body('notes')
+      .optional()
+      .isString()
+      .isLength({ max: 500 })
+      .withMessage('備註不能超過500個字符'),
+    handleValidationErrors
   ]
 };
 

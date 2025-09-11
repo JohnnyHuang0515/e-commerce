@@ -112,43 +112,43 @@ export interface LogisticsSearchParams {
 export class LogisticsService {
   // 獲取配送列表
   static async getShipments(params?: LogisticsSearchParams): Promise<ApiResponse<PaginatedResponse<Shipment>>> {
-    const response = await logisticsApi.get('/shipments', { params });
+    const response = await logisticsApi.get('/v1/shipments', { params });
     return response.data;
   }
 
   // 獲取配送詳情
   static async getShipment(shipmentId: string): Promise<ApiResponse<Shipment>> {
-    const response = await logisticsApi.get(`/shipments/${shipmentId}`);
+    const response = await logisticsApi.get(`/v1/shipments/${shipmentId}`);
     return response.data;
   }
 
   // 建立配送
   static async createShipment(data: ShipmentCreateRequest): Promise<ApiResponse<Shipment>> {
-    const response = await logisticsApi.post('/shipments', data);
+    const response = await logisticsApi.post('/v1/shipments', data);
     return response.data;
   }
 
   // 取消配送
   static async cancelShipment(shipmentId: string, reason: string): Promise<ApiResponse<any>> {
-      const response = await logisticsApi.post(`/shipments/${shipmentId}/cancel`, { reason });
+      const response = await logisticsApi.post(`/v1/shipments/${shipmentId}/cancel`, { reason });
       return response.data;
   }
 
   // 追蹤配送
   static async trackShipment(shipmentId: string): Promise<ApiResponse<TrackingEvent[]>> {
-    const response = await logisticsApi.get(`/shipments/${shipmentId}/track`);
+    const response = await logisticsApi.get(`/v1/shipments/${shipmentId}/track`);
     return response.data;
   }
 
   // 計算配送費用
   static async calculateCost(data: CostCalculationRequest): Promise<ApiResponse<{ cost: number; currency: string }>> {
-      const response = await logisticsApi.post('/calculate-cost', data);
+      const response = await logisticsApi.post('/v1/calculate-cost', data);
       return response.data;
   }
 
   // 獲取配送統計
   static async getStats(params?: { period?: string; startDate?: string; endDate?: string }): Promise<ApiResponse<LogisticsStats>> {
-    const response = await logisticsApi.get('/stats', { params });
+    const response = await logisticsApi.get('/v1/stats', { params });
     return response.data;
   }
 }

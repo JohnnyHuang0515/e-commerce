@@ -51,31 +51,31 @@ export class LogService {
 
   // 創建日誌
   static async createLog(logData: Partial<LogEntry>): Promise<ApiResponse<void>> {
-    const response = await logApi.post('/logs', logData);
+    const response = await logApi.post('/v1/logs', logData);
     return response.data;
   }
 
   // 批量創建日誌
   static async createBatchLogs(logs: Partial<LogEntry>[]): Promise<ApiResponse<void>> {
-    const response = await logApi.post('/logs/batch', { logs });
+    const response = await logApi.post('/v1/logs/batch', { logs });
     return response.data;
   }
 
   // 查詢日誌
   static async getLogs(params: LogQueryParams = {}): Promise<ApiResponse<PaginatedResponse<LogEntry>>> {
-    const response = await logApi.get('/logs', { params });
+    const response = await logApi.get('/v1/logs', { params });
     return response.data;
   }
 
   // 獲取日誌統計
   static async getLogStats(params?: { startDate?: string, endDate?: string }): Promise<ApiResponse<LogStats>> {
-    const response = await logApi.get('/logs/stats', { params });
+    const response = await logApi.get('/v1/logs/stats', { params });
     return response.data;
   }
 
   // 清理舊日誌
   static async cleanupLogs(days: number): Promise<ApiResponse<void>> {
-      const response = await logApi.post('/logs/cleanup', { days });
+      const response = await logApi.post('/v1/logs/cleanup', { days });
       return response.data;
   }
 }

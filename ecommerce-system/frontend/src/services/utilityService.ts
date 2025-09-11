@@ -92,58 +92,58 @@ export class UtilityService {
     if(request.tags) formData.append('tags', request.tags.join(','));
     if(request.isPublic) formData.append('isPublic', String(request.isPublic));
 
-    const response = await utilityApi.post('/files/upload', formData, {
+    const response = await utilityApi.post('/v1/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   }
 
   static async getFiles(filter: FileFilter = {}): Promise<ApiResponse<PaginatedResponse<FileInfo>>> {
-    const response = await utilityApi.get('/files', { params: filter });
+    const response = await utilityApi.get('/v1/files', { params: filter });
     return response.data;
   }
 
   static async downloadFile(fileId: string): Promise<Blob> {
-    const response = await utilityApi.get(`/files/${fileId}/download`, { responseType: 'blob' });
+    const response = await utilityApi.get(`/v1/files/${fileId}/download`, { responseType: 'blob' });
     return response.data;
   }
 
   static async deleteFile(fileId: string): Promise<ApiResponse<void>> {
-      const response = await utilityApi.delete(`/files/${fileId}`);
+      const response = await utilityApi.delete(`/v1/files/${fileId}`);
       return response.data;
   }
 
   // 備份管理
   static async createBackup(request: BackupRequest): Promise<ApiResponse<{ backup: BackupInfo }>> {
-    const response = await utilityApi.post('/backups', request);
+    const response = await utilityApi.post('/v1/backups', request);
     return response.data;
   }
 
   static async getBackups(filter: BackupFilter = {}): Promise<ApiResponse<PaginatedResponse<BackupInfo>>> {
-    const response = await utilityApi.get('/backups', { params: filter });
+    const response = await utilityApi.get('/v1/backups', { params: filter });
     return response.data;
   }
 
   // 還原管理
   static async createRestore(request: RestoreRequest): Promise<ApiResponse<{ restore: RestoreInfo }>> {
-    const response = await utilityApi.post('/restores', request);
+    const response = await utilityApi.post('/v1/restores', request);
     return response.data;
   }
 
   static async getRestores(filter: { page?: number, limit?: number } = {}): Promise<ApiResponse<PaginatedResponse<RestoreInfo>>> {
-      const response = await utilityApi.get('/restores', { params: filter });
+      const response = await utilityApi.get('/v1/restores', { params: filter });
       return response.data;
   }
 
   // 系統統計
   static async getSystemStats(params?: { startDate?: string, endDate?: string }): Promise<ApiResponse<SystemStats>> {
-    const response = await utilityApi.get('/stats', { params });
+    const response = await utilityApi.get('/v1/stats', { params });
     return response.data;
   }
 
   // CSV匯出
   static async exportToCSV(type: 'files' | 'backups' | 'restores', params?: { startDate?: string, endDate?: string }): Promise<Blob> {
-    const response = await utilityApi.get(`/export/csv`, { params: { type, ...params }, responseType: 'blob' });
+    const response = await utilityApi.get(`/v1/export/csv`, { params: { type, ...params }, responseType: 'blob' });
     return response.data;
   }
 }

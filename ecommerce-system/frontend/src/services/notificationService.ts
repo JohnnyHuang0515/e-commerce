@@ -81,55 +81,55 @@ export class NotificationService {
 
   // 模板管理
   static async createTemplate(templateData: CreateTemplateRequest): Promise<ApiResponse<{ template: NotificationTemplate }>> {
-    const response = await notificationApi.post('/templates', templateData);
+    const response = await notificationApi.post('/v1/templates', templateData);
     return response.data;
   }
 
   static async getTemplates(filter: TemplateFilter = {}): Promise<ApiResponse<{ templates: NotificationTemplate[] }>> {
-    const response = await notificationApi.get('/templates', { params: filter });
+    const response = await notificationApi.get('/v1/templates', { params: filter });
     return response.data;
   }
 
   static async updateTemplate(id: string, templateData: Partial<CreateTemplateRequest>): Promise<ApiResponse<{ template: NotificationTemplate }>> {
-    const response = await notificationApi.put(`/templates/${id}`, templateData);
+    const response = await notificationApi.put(`/v1/templates/${id}`, templateData);
     return response.data;
   }
 
   static async deleteTemplate(id: string): Promise<ApiResponse<void>> {
-    const response = await notificationApi.delete(`/templates/${id}`);
+    const response = await notificationApi.delete(`/v1/templates/${id}`);
     return response.data;
   }
 
   // 通知管理
   static async sendNotification(notificationData: SendNotificationRequest): Promise<ApiResponse<{ notification: Notification }>> {
-    const response = await notificationApi.post('/send', notificationData);
+    const response = await notificationApi.post('/v1/send', notificationData);
     return response.data;
   }
 
   static async getNotifications(filter: NotificationFilter = {}): Promise<ApiResponse<PaginatedResponse<Notification>>> {
-    const response = await notificationApi.get('/', { params: filter });
+    const response = await notificationApi.get('/v1/', { params: filter });
     return response.data;
   }
 
   static async markAsRead(notificationId: string): Promise<ApiResponse<void>> {
-    const response = await notificationApi.put(`/${notificationId}/read`);
+    const response = await notificationApi.put(`/v1/${notificationId}/read`);
     return response.data;
   }
 
   // 統計分析
   static async getStats(params?: { startDate?: string, endDate?: string }): Promise<ApiResponse<NotificationStats>> {
-    const response = await notificationApi.get('/stats', { params });
+    const response = await notificationApi.get('/v1/stats', { params });
     return response.data;
   }
 
   // 處理操作
   static async processPendingNotifications(limit: number = 100): Promise<ApiResponse<{ processed: number, failed: number }>> {
-    const response = await notificationApi.post('/process-pending', { limit });
+    const response = await notificationApi.post('/v1/process-pending', { limit });
     return response.data;
   }
 
   static async retryFailedNotifications(limit: number = 100): Promise<ApiResponse<{ retried: number, failed: number }>> {
-    const response = await notificationApi.post('/retry-failed', { limit });
+    const response = await notificationApi.post('/v1/retry-failed', { limit });
     return response.data;
   }
 }

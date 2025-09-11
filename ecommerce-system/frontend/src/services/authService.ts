@@ -47,7 +47,7 @@ export class AuthService {
   // 用戶登入
   static async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     try {
-      const response = await authApi.post('/auth/login', credentials);
+      const response = await authApi.post('/v1/auth/login', credentials);
       
       // 保存 token 到 localStorage
       if (response.data.success && response.data.data.token) {
@@ -65,7 +65,7 @@ export class AuthService {
   // 用戶註冊
   static async register(userData: RegisterRequest): Promise<ApiResponse<LoginResponse>> {
     try {
-      const response = await authApi.post('/auth/register', userData);
+      const response = await authApi.post('/v1/auth/register', userData);
       
       // 保存 token 到 localStorage
       if (response.data.success && response.data.data.token) {
@@ -83,7 +83,7 @@ export class AuthService {
   // 用戶登出
   static async logout(): Promise<void> {
     try {
-      await authApi.post('/auth/logout');
+      await authApi.post('/v1/auth/logout');
     } catch (error) {
       console.error('登出請求失敗:', error);
     } finally {
@@ -96,7 +96,7 @@ export class AuthService {
   // 獲取用戶資料
   static async getProfile(): Promise<ApiResponse<UserProfile>> {
     try {
-      const response = await authApi.get('/api/v1/auth/profile');
+      const response = await authApi.get('/v1/auth/profile');
       return response.data;
     } catch (error) {
       console.error('獲取用戶資料失敗:', error);
@@ -107,7 +107,7 @@ export class AuthService {
   // 更新用戶資料
   static async updateProfile(userData: Partial<UserProfile>): Promise<ApiResponse<UserProfile>> {
     try {
-      const response = await authApi.put('/auth/profile', userData);
+      const response = await authApi.put('/v1/auth/profile', userData);
       return response.data;
     } catch (error) {
       console.error('更新用戶資料失敗:', error);
@@ -118,7 +118,7 @@ export class AuthService {
   // 修改密碼
   static async changePassword(passwordData: ChangePasswordRequest): Promise<ApiResponse<void>> {
     try {
-      const response = await authApi.put('/auth/change-password', passwordData);
+      const response = await authApi.put('/v1/auth/change-password', passwordData);
       return response.data;
     } catch (error) {
       console.error('修改密碼失敗:', error);
@@ -129,7 +129,7 @@ export class AuthService {
   // 刷新 token
   static async refreshToken(): Promise<ApiResponse<{ token: string; expiresIn: number }>> {
     try {
-      const response = await authApi.post('/auth/refresh');
+      const response = await authApi.post('/v1/auth/refresh');
       
       if (response.data.success && response.data.data.token) {
         localStorage.setItem('auth_token', response.data.data.token);
@@ -145,7 +145,7 @@ export class AuthService {
   // 驗證 token 有效性
   static async verifyToken(): Promise<ApiResponse<{ valid: boolean; user?: UserProfile }>> {
     try {
-      const response = await authApi.get('/api/v1/auth/verify');
+      const response = await authApi.get('/v1/auth/verify');
       return response.data;
     } catch (error) {
       console.error('驗證 token 失敗:', error);

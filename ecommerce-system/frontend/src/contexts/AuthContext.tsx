@@ -46,7 +46,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('解析用戶信息失敗:', error);
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user_info');
+        setUser(null);
+        setToken(null);
       }
+    } else {
+      // 如果沒有 token 或 userInfo，清除狀態
+      setUser(null);
+      setToken(null);
     }
     
     setIsLoading(false);
@@ -76,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     user,
     token,
-    isAuthenticated: !!user,
+    isAuthenticated: !!(user && token),
     isLoading,
     login,
     logout,
