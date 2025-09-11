@@ -26,6 +26,7 @@ const userRoutes = require('./routes/user');
 const permissionRoutes = require('./routes/permission');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3002;
 
 // 中間件

@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    product_id UUID NOT NULL,
+    product_id VARCHAR(50) NOT NULL, -- 改為 VARCHAR 以存儲 MongoDB ObjectId
     product_name VARCHAR(255) NOT NULL,
     product_sku VARCHAR(50) NOT NULL,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
@@ -559,7 +559,7 @@ ON CONFLICT (key) DO NOTHING;
 
 -- 創建預設管理員用戶
 INSERT INTO users (email, password, name, role, status, email_verified_at)
-VALUES ('admin@ecommerce.com', '$2b$10$rQZ8K9vXqH2nM3pL4sT5uO6wE7yF8gH9iJ0kL1mN2oP3qR4sT5uV6wX7yZ8', '系統管理員', 'ADMIN', 'active', NOW())
+VALUES ('admin@ecommerce.com', '$2b$10$ZUowWee1Dh.zuukcIGVMReJ3Krs4cxiv3YBcHwq7cl0h4o3eUxIBC', '系統管理員', 'ADMIN', 'active', NOW())
 ON CONFLICT (email) DO NOTHING;
 
 -- 為管理員分配 ADMIN 角色

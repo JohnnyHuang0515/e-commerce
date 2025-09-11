@@ -205,7 +205,7 @@ const AdminDashboard: React.FC = () => {
       title: '價格',
       dataIndex: 'price',
       key: 'price',
-      render: (price: number) => `¥${price}`,
+      render: (price: number) => `${price}`,
     },
     {
       title: '庫存',
@@ -239,7 +239,7 @@ const AdminDashboard: React.FC = () => {
       title: '總金額',
       dataIndex: 'total',
       key: 'total',
-      render: (total: number) => `¥${total}`,
+      render: (total: number) => `${total}`,
     },
     {
       title: '狀態',

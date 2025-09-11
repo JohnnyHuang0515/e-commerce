@@ -1,8 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // API 基礎配置 - 通過 Nginx 代理連接到後端服務
-const API_BASE_URL = '/api';
-const API_TIMEOUT = 10000;
+const API_BASE_URL = 'http://localhost:8080/api';
+const API_TIMEOUT = 30000; // 增加到 30 秒
 
 // 統一 API 路徑配置
 const API_PATHS = {
@@ -107,3 +107,45 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+// Dashboard 圖表數據類型
+export interface DailySalesData {
+  date: string;
+  sales: number;
+  orders: number;
+  users: number;
+}
+
+export interface OrderStatusData {
+  status: string;
+  count: number;
+  amount: number;
+  color: string;
+}
+
+export interface PopularProduct {
+  id: string;
+  name: string;
+  image: string;
+  price: number;
+  salesCount: number;
+  totalQuantity: number;
+  totalSales: number;
+  growth: number;
+}
+
+// Dashboard API 函數
+export const getDailySalesData = async (period: string = 'month'): Promise<ApiResponse<DailySalesData[]>> => {
+  const response = await dashboardApi.get(`/v1/dashboard/daily-sales?period=${period}`);
+  return response.data;
+};
+
+export const getOrderStatusData = async (): Promise<ApiResponse<OrderStatusData[]>> => {
+  const response = await dashboardApi.get('/v1/dashboard/order-status');
+  return response.data;
+};
+
+export const getPopularProductsData = async (limit: number = 10): Promise<ApiResponse<PopularProduct[]>> => {
+  const response = await dashboardApi.get(`/v1/dashboard/popular-products?limit=${limit}`);
+  return response.data;
+};

@@ -1,0 +1,405 @@
+/* 優化UI樣式 - 簡潔美觀設計 */
+
+/* 基礎響應式斷點 */
+:root {
+  --mobile-breakpoint: 768px;
+  --tablet-breakpoint: 1024px;
+  --desktop-breakpoint: 1200px;
+  
+  /* 優化顏色變量 */
+  --primary-color: #1890ff;
+  --secondary-color: #52c41a;
+  --accent-color: #faad14;
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  
+  /* 動畫變量 */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* 陰影變量 */
+  --shadow-light: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-heavy: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 優化卡片樣式 */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-light);
+  transition: all var(--transition-normal);
+}
+
+.glass-card:hover {
+  box-shadow: var(--shadow-medium);
+  transform: translateY(-1px);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .glass-card {
+    border-radius: 8px;
+    margin: 8px;
+  }
+  
+  .dashboard-page .stats-row .ant-col {
+    margin-bottom: 16px;
+  }
+  
+  .login-card {
+    margin: 16px;
+    padding: 16px;
+  }
+  
+  .main-sider {
+    position: fixed !important;
+    z-index: 1000;
+    height: 100vh;
+  }
+  
+  .main-content {
+    margin-left: 0 !important;
+  }
+  
+  .main-header {
+    padding: 0 16px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .glass-card {
+    margin: 12px;
+  }
+  
+  .dashboard-page .stats-row .ant-col {
+    margin-bottom: 20px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .glass-card {
+    margin: 16px;
+  }
+  
+  .dashboard-page .stats-row .ant-col {
+    margin-bottom: 24px;
+  }
+}
+
+/* 無障礙功能 */
+.glass-card:focus-within {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* 高對比度模式支持 */
+@media (prefers-contrast: high) {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid #000;
+    color: #000;
+  }
+  
+  .glass-card:hover {
+    background: rgba(255, 255, 255, 1);
+  }
+}
+
+/* 減少動畫模式支持 */
+@media (prefers-reduced-motion: reduce) {
+  .glass-card,
+  .glass-card:hover {
+    transition: none;
+    transform: none;
+  }
+  
+  .aurora-background {
+    animation: none !important;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(0, 0, 0, 0.3);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+  
+  .glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: #fff;
+  }
+  
+  .glass-card:hover {
+    background: rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* 動畫優化 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* 按鈕樣式優化 */
+.ant-btn {
+  transition: all var(--transition-fast);
+  border-radius: 8px;
+}
+
+.ant-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-light);
+}
+
+.ant-btn:active {
+  transform: translateY(0);
+}
+
+/* 輸入框樣式優化 */
+.ant-input,
+.ant-input-password {
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
+
+.ant-input:focus,
+.ant-input-password:focus {
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* 表格樣式優化 */
+.ant-table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-table-thead > tr > th {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+/* 卡片樣式優化 */
+.ant-card {
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-normal);
+}
+
+.ant-card:hover {
+  box-shadow: var(--shadow-medium);
+  transform: translateY(-2px);
+}
+
+/* 模態框樣式優化 */
+.ant-modal-content {
+  border-radius: 16px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+
+.ant-modal-header {
+  background: transparent;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* 選單樣式優化 */
+.ant-menu {
+  background: transparent;
+}
+
+.ant-menu-item {
+  border-radius: 8px;
+  margin: 4px 8px;
+  transition: all var(--transition-fast);
+}
+
+.ant-menu-item:hover {
+  background: rgba(102, 126, 234, 0.2);
+}
+
+.ant-menu-item-selected {
+  background: rgba(102, 126, 234, 0.3);
+}
+
+/* 統計卡片樣式 */
+.ant-statistic-title {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+.ant-statistic-content {
+  color: #fff;
+}
+
+/* 標籤樣式優化 */
+.ant-tag {
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+}
+
+/* 分頁器樣式優化 */
+.ant-pagination {
+  text-align: center;
+}
+
+.ant-pagination-item {
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+}
+
+.ant-pagination-item:hover {
+  border-color: var(--primary-color);
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.ant-pagination-item-active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+/* 加載動畫優化 */
+.ant-spin-dot {
+  color: var(--primary-color);
+}
+
+/* 警告框樣式優化 */
+.ant-alert {
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+}
+
+/* 工具提示樣式優化 */
+.ant-tooltip-inner {
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+/* 下拉選單樣式優化 */
+.ant-dropdown-menu {
+  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-heavy);
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 8px;
+  margin: 4px 8px;
+  transition: all var(--transition-fast);
+}
+
+.ant-dropdown-menu-item:hover {
+  background: rgba(102, 126, 234, 0.2);
+}
+
+/* 表單樣式優化 */
+.ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+.ant-form-item-explain-error {
+  color: #ff4d4f;
+}
+
+/* 選項卡樣式優化 */
+.ant-tabs-tab {
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.ant-tabs-tab:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.ant-tabs-tab-active {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+}
+
+/* 響應式字體大小 */
+@media (max-width: 768px) {
+  .ant-typography h1 {
+    font-size: 24px;
+  }
+  
+  .ant-typography h2 {
+    font-size: 20px;
+  }
+  
+  .ant-typography h3 {
+    font-size: 18px;
+  }
+}
+
+/* 觸控設備優化 */
+@media (hover: none) and (pointer: coarse) {
+  .glass-card:hover {
+    transform: none;
+  }
+  
+  .ant-btn:hover {
+    transform: none;
+  }
+  
+  .ant-card:hover {
+    transform: none;
+  }
+}
+
+/* 打印樣式 */
+@media print {
+  .glass-card {
+    background: white;
+    border: 1px solid #000;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  
+  .aurora-background {
+    display: none;
+  }
+}

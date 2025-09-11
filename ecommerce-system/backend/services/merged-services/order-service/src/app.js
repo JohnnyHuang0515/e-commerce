@@ -9,6 +9,7 @@ require('dotenv').config({ path: '../.env' });
 
 // 資料庫連接 - 簡化版本
 const { Client } = require('pg');
+const { sequelize } = require('./models');
 // const mongoose = require('mongoose'); // 暫時移除 mongoose
 
 const testPostgresConnection = async () => {

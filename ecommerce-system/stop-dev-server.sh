@@ -27,9 +27,24 @@ else
     echo "   請檢查 Docker 是否正在運行，或手動執行 'docker compose down'。 "
 fi
 
-# 提醒用戶手動停止前端服務
 echo ""
-echo "ℹ️  此腳本不會停止手動啟動的前端開發伺服器 (Vite)。"
-echo "   如果它還在運行，請在對應的終端機視窗中按 Ctrl+C 來停止它。"
+echo "🔧 清理前端開發服務器..."
+# 清理所有相關的 Node.js 進程
+pkill -f "npm run dev" 2>/dev/null || true
+pkill -f "vite" 2>/dev/null || true
+pkill -f "node.*frontend" 2>/dev/null || true
+
+echo "🔧 清理端口占用..."
+# 清理可能占用的端口
+PORTS=(3000 3001 3002 3003 3004 3005 3006 3007 3008 3009 8080 8081 9011)
+for port in "${PORTS[@]}"; do
+    PID=$(lsof -ti:$port 2>/dev/null)
+    if [ ! -z "$PID" ]; then
+        echo "   終止進程 $PID (端口 $port)"
+        kill -9 $PID 2>/dev/null || true
+    fi
+done
+
+echo "✅ 清理完成。"
 echo "======================================================"
 echo "🎉 開發環境已停止。"

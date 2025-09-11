@@ -48,16 +48,16 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       // 壓縮圖片
       const compressedFile = await ImageService.compressImage(file, 0.8, 1920);
       
-      // 模擬上傳進度
+      // 模擬上傳進度 - 改進進度邏輯
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
-          if (prev >= 90) {
+          if (prev >= 95) {
             clearInterval(progressInterval);
-            return 90;
+            return 95;
           }
-          return prev + 10;
+          return prev + 15;
         });
-      }, 100);
+      }, 150);
 
       // 上傳到服務器
       const response = await ImageService.uploadImage(compressedFile, {
@@ -67,6 +67,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         tags: entityType
       });
 
+      // 確保進度條完成
       clearInterval(progressInterval);
       setUploadProgress(100);
 
@@ -74,13 +75,20 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         const newImages = [...images, response.data];
         onChange?.(newImages);
         message.success('圖片上傳成功');
+        
+        // 延遲重置狀態，讓用戶看到100%完成
+        setTimeout(() => {
+          setUploading(false);
+          setUploadProgress(0);
+        }, 500);
       } else {
         message.error('圖片上傳失敗');
+        setUploading(false);
+        setUploadProgress(0);
       }
     } catch (error) {
       console.error('上傳圖片錯誤:', error);
       message.error('圖片上傳失敗');
-    } finally {
       setUploading(false);
       setUploadProgress(0);
     }

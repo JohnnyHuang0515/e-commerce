@@ -110,14 +110,45 @@ const getUserAnalytics = async (req, res) => {
 
 const getUserOverview = async (req, res) => {
     try {
-        // Mock response for user overview
+        // 從資料庫獲取真實用戶數據
+        const totalUsers = await User.count();
+        const activeUsers = await User.count({ where: { status: 'ACTIVE' } });
+        
+        // 計算本月新用戶
+        const currentMonth = new Date();
+        currentMonth.setDate(1);
+        currentMonth.setHours(0, 0, 0, 0);
+        
+        const newUsers = await User.count({
+            where: {
+                created_at: {
+                    [require('sequelize').Op.gte]: currentMonth
+                }
+            }
+        });
+
+        // 計算用戶增長率（簡化版本）
+        const lastMonth = new Date(currentMonth);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        
+        const lastMonthUsers = await User.count({
+            where: {
+                created_at: {
+                    [require('sequelize').Op.gte]: lastMonth,
+                    [require('sequelize').Op.lt]: currentMonth
+                }
+            }
+        });
+
+        const userGrowth = lastMonthUsers > 0 ? ((newUsers - lastMonthUsers) / lastMonthUsers * 100) : 0;
+
         res.json({ 
             success: true, 
             data: {
-                totalUsers: 0,
-                activeUsers: 0,
-                newUsers: 0,
-                userGrowth: 0
+                totalUsers,
+                activeUsers,
+                newUsers,
+                userGrowth: Math.round(userGrowth * 100) / 100
             },
             message: 'User overview fetched successfully' 
         });

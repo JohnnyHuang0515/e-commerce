@@ -5,6 +5,11 @@ const {
   getOverview,
   getStats,
   getSummary,
+  getDailySalesTrend,
+  getOrderStatusDistribution,
+  getPopularProducts,
+  getUserBehavior,
+  getSystemHealth,
   getRealtime,
   getMetrics,
   getTrends,
@@ -32,6 +37,11 @@ router.get('/overview', getOverview);
 router.get('/stats', getStats);
 router.get('/summary', getSummary);
 
+// Chart Data
+router.get('/daily-sales', getDailySalesTrend);
+router.get('/order-status', getOrderStatusDistribution);
+router.get('/popular-products', getPopularProducts);
+
 // Realtime Data
 router.get('/realtime', getRealtime);
 router.get('/metrics', getMetrics);
@@ -57,5 +67,8 @@ router.get('/reports', getReports);
 router.post('/reports/generate', createReport); // Matching the API doc
 router.get('/reports/:id', getReport);
 
+// User Behavior and System Health (暫時註解掉，因為函數未定義)
+// router.get('/user-behavior', getUserBehavior);
+// router.get('/system-health', getSystemHealth);
 
 module.exports = router;

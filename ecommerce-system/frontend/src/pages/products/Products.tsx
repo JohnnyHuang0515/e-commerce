@@ -26,6 +26,7 @@ import {
 import PageHeader from '../../components/common/PageHeader';
 import ImageUpload from '../../components/common/ImageUpload';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../../hooks/useApi';
+import { useCategories } from '../../hooks/useCategories';
 import { Image as ImageType } from '../../services/imageService';
 import './Products.less';
 
@@ -64,30 +65,17 @@ const Products: React.FC = () => {
 
   // API hooks
   const { data: productsData, isLoading, refetch } = useProducts(searchParams);
+  const { data: categoriesData } = useCategories();
   const createProductMutation = useCreateProduct();
   const updateProductMutation = useUpdateProduct();
   const deleteProductMutation = useDeleteProduct();
 
   const products = productsData?.data?.items || [];
   const total = productsData?.data?.total || 0;
+  const categories = categoriesData?.data || [];
 
   // 表格列定義
   const columns = [
-    {
-      title: '商品圖片',
-      dataIndex: 'images',
-      key: 'images',
-      width: 80,
-      render: (images: string[]) => (
-        <Image
-          width={40}
-          height={40}
-          src={images?.[0] || '/placeholder-image.png'}
-          fallback="/placeholder-image.png"
-          style={{ borderRadius: 4 }}
-        />
-      ),
-    },
     {
       title: '商品名稱',
       dataIndex: 'name',
@@ -156,10 +144,10 @@ const Products: React.FC = () => {
       width: 120,
       render: (price: number, record: any) => (
         <div>
-          <div style={{ fontWeight: 500 }}>¥{price}</div>
+          <div style={{ fontWeight: 500 }}>{price}</div>
           {record.originalPrice && record.originalPrice > price && (
             <div style={{ fontSize: 12, color: '#999', textDecoration: 'line-through' }}>
-              ¥{record.originalPrice}
+              {record.originalPrice}
             </div>
           )}
         </div>
@@ -188,6 +176,9 @@ const Products: React.FC = () => {
           draft: { color: 'orange', text: '草稿' },
         };
         const config = statusConfig[status as keyof typeof statusConfig];
+        if (!config) {
+          return <Tag>{status || '未知狀態'}</Tag>;
+        }
         return <Tag color={config.color}>{config.text}</Tag>;
       },
     },
@@ -218,7 +209,7 @@ const Products: React.FC = () => {
           />
           <Popconfirm
             title="確定要刪除這個商品嗎？"
-            onConfirm={() => handleDelete(record.id)}
+            onConfirm={() => handleDelete(record._id || record.id)}
             okText="確定"
             cancelText="取消"
           >
@@ -265,9 +256,14 @@ const Products: React.FC = () => {
 
   const handleEdit = (product: any) => {
     setEditingProduct(product);
+    
+    // 找到對應的分類 ID
+    const categoryId = categories.find(cat => cat.name === product.category)?._id;
+    
     form.setFieldsValue({
       ...product,
       tags: product.tags?.join(',') || '',
+      categoryId: categoryId || product.categoryId || product.category,
     });
     setModalVisible(true);
   };
@@ -280,7 +276,7 @@ const Products: React.FC = () => {
         <div>
           <p><strong>商品名稱:</strong> {product.name}</p>
           <p><strong>描述:</strong> {product.description}</p>
-          <p><strong>價格:</strong> ¥{product.price}</p>
+          <p><strong>價格:</strong> {product.price}</p>
           <p><strong>分類:</strong> {product.category}</p>
           <p><strong>品牌:</strong> {product.brand}</p>
           <p><strong>SKU:</strong> {product.sku}</p>
@@ -306,17 +302,26 @@ const Products: React.FC = () => {
       // 提取圖片 URL
       const imageUrls = productImages.map(img => img.url);
       
+      // 找到選中的分類
+      const selectedCategory = categories.find(cat => cat._id === values.categoryId);
+      
       const productData = {
         ...values,
         attributes: values.attributes || {},
         images: imageUrls,
-        category: values.categoryId,
-        brand: 'Default Brand',
+        category: selectedCategory?.name || '未分類',
+        brand: values.brand || 'Default Brand',
         sku: `SKU-${Date.now()}`,
       };
 
       if (editingProduct) {
-        await updateProductMutation.mutateAsync({ id: editingProduct.id, ...productData });
+        // 使用 _id 或 id，確保有正確的 ID
+        const productId = editingProduct._id || editingProduct.id;
+        if (!productId) {
+          message.error('商品 ID 不存在');
+          return;
+        }
+        await updateProductMutation.mutateAsync({ id: productId, ...productData });
         message.success('商品更新成功');
       } else {
         await createProductMutation.mutateAsync(productData);
@@ -394,7 +399,7 @@ const Products: React.FC = () => {
           columns={columns}
           dataSource={products}
           loading={isLoading}
-          rowKey="id"
+          rowKey="_id"
           pagination={{
             current: searchParams.page,
             pageSize: searchParams.limit,
@@ -480,13 +485,8 @@ const Products: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="originalPrice" label="原價">
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="原價"
-                  min={0}
-                  precision={2}
-                />
+              <Form.Item name="brand" label="品牌">
+                <Input placeholder="品牌" />
               </Form.Item>
             </Col>
           </Row>
@@ -499,10 +499,11 @@ const Products: React.FC = () => {
                 rules={[{ required: true, message: '請選擇分類' }]}
               >
                 <Select placeholder="請選擇分類">
-                  <Option value="68b7d361f9f4bfdffafa3350">智慧型手機</Option>
-                  <Option value="68b7d361f9f4bfdffafa3351">筆記型電腦</Option>
-                  <Option value="68b7d361f9f4bfdffafa3352">平板電腦</Option>
-                  <Option value="68b7d361f9f4bfdffafa3353">iPhone</Option>
+                  {categories.map((category) => (
+                    <Option key={category._id} value={category._id}>
+                      {category.name}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>
@@ -522,7 +523,7 @@ const Products: React.FC = () => {
           <Form.Item label="商品圖片">
             <ImageUpload
               entityType="product"
-              entityId={editingProduct?.id || 'new'}
+              entityId={editingProduct?._id || editingProduct?.id || 'new'}
               images={productImages}
               maxCount={5}
               onChange={setProductImages}

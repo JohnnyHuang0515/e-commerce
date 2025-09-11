@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+// 移除複雜的動畫組件
 import './Login.less';
 
 const { Title, Text } = Typography;
@@ -76,9 +77,7 @@ const Login: React.FC = () => {
     <div className="login-container">
       <div className="login-background">
         <div className="login-content">
-          <Row justify="center" align="middle" style={{ minHeight: '100vh' }}>
-            <Col xs={24} sm={24} md={20} lg={16} xl={14}>
-              <Card className="login-card" variant="borderless">
+          <Card className="login-card" variant="borderless">
                 <div className="login-header">
                   <div className="logo-section">
                     <ShoppingOutlined className="logo-icon" />
@@ -171,9 +170,7 @@ const Login: React.FC = () => {
                     </Text>
                   </Space>
                 </div>
-              </Card>
-            </Col>
-          </Row>
+          </Card>
         </div>
       </div>
     </div>

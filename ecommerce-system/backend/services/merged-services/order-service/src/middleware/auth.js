@@ -3,18 +3,22 @@ const jwt = require('jsonwebtoken');
 // JWT 認證中間件
 const authenticateToken = async (req, res, next) => {
   try {
+    console.log('🔐 認證中間件開始:', req.path);
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
+      console.log('❌ 未提供認證令牌');
       return res.status(401).json({
         success: false,
         message: '未提供認證令牌'
       });
     }
 
+    console.log('✅ 開始驗證token');
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-development');
     req.user = decoded;
+    console.log('✅ 認證成功，用戶:', decoded.email);
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {

@@ -54,7 +54,17 @@ export interface ProductBrand {
 export class ProductService {
   // --- Product Management ---
   static async getProducts(params?: ProductSearchParams): Promise<ApiResponse<PaginatedResponse<Product>>> {
-    const response = await productApi.get('/v1/products/', { params });
+    const response = await productApi.get('/v1/products', { 
+      params: {
+        page: params?.page || 1,
+        limit: params?.limit || 10,
+        search: params?.search || '',
+        category: params?.category || '',
+        status: params?.status || '',
+        sortBy: params?.sortBy || 'createdAt',
+        sortOrder: params?.sortOrder || 'desc'
+      }
+    });
     return response.data;
   }
 

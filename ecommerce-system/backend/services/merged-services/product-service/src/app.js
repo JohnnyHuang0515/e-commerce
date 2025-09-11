@@ -33,9 +33,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
 }));
 
 // API Routes
+app.use('/api/v1/categories', categoryRoutes);
+app.use('/api/v1/brands', brandRoutes);
 app.use('/api/v1/products', productRoutes);
-app.use('/api/v1/products/categories', categoryRoutes);
-app.use('/api/v1/products/brands', brandRoutes);
 
 
 // Health Check

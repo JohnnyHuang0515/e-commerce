@@ -6,7 +6,6 @@ import zhTW from 'antd/locale/zh_TW';
 
 // 導入全新的主題系統
 import { useTheme } from './hooks/useTheme';
-import { ThemeToggleButton } from './components/ThemeToggleButton';
 
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -51,7 +50,6 @@ const AppContent: React.FC = () => {
       }}
     >
       <AuthProvider>
-        <ThemeToggleButton theme={theme} onClick={toggleTheme} />
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />

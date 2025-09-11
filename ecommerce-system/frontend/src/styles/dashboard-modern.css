@@ -1,0 +1,334 @@
+/* 🎨 現代化儀表板設計 */
+
+.dashboard-page {
+  background: #000000;
+  min-height: 100vh;
+  padding: var(--space-2xl);
+}
+
+.dashboard-content {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 📊 統計卡片網格 */
+.stats-row {
+  margin-bottom: var(--space-4xl);
+}
+
+.stats-row .ant-col {
+  margin-bottom: var(--space-lg);
+}
+
+/* 🎯 圖表卡片 */
+.charts-row {
+  margin-bottom: var(--space-4xl);
+}
+
+.chart-card {
+  background: #1a1a1a;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+  overflow: hidden;
+  position: relative;
+}
+
+.chart-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-500), var(--success-500), var(--warning-500), var(--error-500));
+  background-size: 200% 100%;
+  animation: chartGradient 3s ease-in-out infinite;
+}
+
+@keyframes chartGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+.chart-card .ant-card-head {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--space-lg) var(--space-2xl);
+}
+
+.chart-card .ant-card-head-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.chart-card .ant-card-body {
+  padding: var(--space-2xl);
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-placeholder {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  font-weight: 500;
+  padding: var(--space-4xl);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--border-medium);
+  width: 100%;
+}
+
+/* 🎯 活動卡片 */
+.activity-row {
+  margin-bottom: var(--space-2xl);
+}
+
+.activity-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+  overflow: hidden;
+  position: relative;
+}
+
+.activity-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-500) 0%, var(--success-500) 100%);
+}
+
+.activity-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.activity-card .ant-card-head {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--space-lg) var(--space-2xl);
+}
+
+.activity-card .ant-card-head-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.activity-card .ant-card-body {
+  padding: var(--space-2xl);
+  min-height: 250px;
+}
+
+.activity-placeholder {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  font-weight: 500;
+  padding: var(--space-3xl);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--border-medium);
+  width: 100%;
+}
+
+/* 🎯 頁面標題 */
+.dashboard-page .ant-page-header {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-2xl);
+  border: 1px solid var(--border-light);
+}
+
+.dashboard-page .ant-page-header-heading-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dashboard-page .ant-page-header-heading-sub-title {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: var(--space-xs);
+}
+
+/* 🎯 刷新按鈕 */
+.dashboard-page .ant-btn {
+  border-radius: var(--radius-lg);
+  height: 40px;
+  padding: 0 var(--space-lg);
+  font-weight: 500;
+  transition: all var(--transition-normal);
+}
+
+.dashboard-page .ant-btn-primary {
+  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+  border: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-page .ant-btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* 🎯 警告框 */
+.dashboard-page .ant-alert {
+  border-radius: var(--radius-lg);
+  border: none;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-2xl);
+}
+
+.dashboard-page .ant-alert-warning {
+  background: var(--warning-50);
+  color: var(--warning-600);
+}
+
+/* 🎯 加載狀態 */
+.dashboard-page .ant-spin-container {
+  min-height: 400px;
+}
+
+.dashboard-page .ant-spin {
+  color: var(--primary-500);
+}
+
+.dashboard-page .ant-spin-dot {
+  color: var(--primary-500);
+}
+
+/* 📱 響應式設計 */
+@media (max-width: 1200px) {
+  .dashboard-page {
+    padding: var(--space-lg);
+  }
+  
+  .chart-card .ant-card-body,
+  .activity-card .ant-card-body {
+    padding: var(--space-lg);
+  }
+  
+  .chart-placeholder,
+  .activity-placeholder {
+    padding: var(--space-2xl);
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-page {
+    padding: var(--space-md);
+  }
+  
+  .stats-row .ant-col {
+    margin-bottom: var(--space-md);
+  }
+  
+  .charts-row,
+  .activity-row {
+    margin-bottom: var(--space-2xl);
+  }
+  
+  .chart-card .ant-card-body,
+  .activity-card .ant-card-body {
+    padding: var(--space-md);
+    min-height: 200px;
+  }
+  
+  .chart-placeholder,
+  .activity-placeholder {
+    padding: var(--space-lg);
+  }
+}
+
+@media (max-width: 576px) {
+  .dashboard-page {
+    padding: var(--space-sm);
+  }
+  
+  .chart-card .ant-card-head,
+  .activity-card .ant-card-head {
+    padding: var(--space-md) var(--space-lg);
+  }
+  
+  .chart-card .ant-card-body,
+  .activity-card .ant-card-body {
+    padding: var(--space-sm);
+    min-height: 150px;
+  }
+}
+
+/* 🌙 深色模式 */
+@media (prefers-color-scheme: dark) {
+  .chart-placeholder,
+  .activity-placeholder {
+    background: var(--bg-tertiary);
+    border-color: var(--border-light);
+  }
+  
+  .dashboard-page .ant-page-header {
+    background: var(--bg-primary);
+    border-color: var(--border-light);
+  }
+}
+
+/* ♿ 無障礙設計 */
+@media (prefers-reduced-motion: reduce) {
+  .chart-card,
+  .activity-card,
+  .dashboard-page .ant-btn-primary,
+  .chart-card::before {
+    animation: none;
+    transition: none;
+  }
+  
+  .chart-card:hover,
+  .activity-card:hover,
+  .dashboard-page .ant-btn-primary:hover {
+    transform: none;
+  }
+}
+
+/* 🖨️ 打印樣式 */
+@media print {
+  .dashboard-page {
+    padding: 0;
+    background: white;
+  }
+  
+  .chart-card,
+  .activity-card {
+    box-shadow: none;
+    border: 1px solid #000;
+    break-inside: avoid;
+  }
+  
+  .chart-placeholder,
+  .activity-placeholder {
+    border: 1px solid #000;
+    background: white;
+  }
+}

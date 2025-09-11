@@ -64,6 +64,11 @@ services:
       NODE_ENV: development
       PORT: 3001
       MONGODB_URI: mongodb://admin:password123@mongodb:27017/ecommerce?authSource=admin
+      MINIO_ENDPOINT: ecommerce-minio-files
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
     ports:
       - "3001:3001"
     # depends_on: 移除依賴，讓服務獨立啟動

@@ -2,6 +2,11 @@ const { Overview, Realtime, Analytics, Widget, Report } = require('../models/Das
 const { 
   checkServiceHealth, 
   aggregateOverviewData, 
+  getDailySalesData,
+  getOrderStatusData,
+  getPopularProductsData,
+  getUserBehaviorData,
+  getSystemHealthData,
   getRealtimeData, 
   getAnalyticsData,
   getWidgetData: getWidgetDataFromService,
@@ -14,7 +19,12 @@ const getOverview = async (req, res) => {
   try {
     const { period = 'month', timezone = 'Asia/Taipei' } = req.query;
     logger.info(`獲取概覽資料: period=${period}, timezone=${timezone}`);
-    const overviewData = await aggregateOverviewData(period);
+    
+    // 從請求頭獲取認證token
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    const overviewData = await aggregateOverviewData(period, token);
     const serviceChecks = await Promise.all([
       checkServiceHealth('auth-service', SERVICES.auth),
       checkServiceHealth('user-service', SERVICES.user),
@@ -59,6 +69,50 @@ const getStats = (req, res) => {
 const getSummary = (req, res) => {
     logger.info('獲取摘要資料');
     res.status(200).json({ success: true, message: 'Summary endpoint hit' });
+};
+
+// 獲取每日銷售趨勢數據
+const getDailySalesTrend = async (req, res) => {
+  try {
+    const { period = 'month' } = req.query;
+    logger.info(`獲取每日銷售趨勢: period=${period}`);
+    const dailySalesData = await getDailySalesData(period);
+    const response = { success: true, data: dailySalesData, message: '每日銷售趨勢獲取成功' };
+    res.json(response);
+  } catch (error) {
+    logger.error('獲取每日銷售趨勢失敗:', error);
+    res.status(500).json({ success: false, message: '獲取每日銷售趨勢失敗', error: error.message });
+  }
+};
+
+// 獲取訂單狀態分布數據
+const getOrderStatusDistribution = async (req, res) => {
+  try {
+    logger.info('獲取訂單狀態分布');
+    const orderStatusData = await getOrderStatusData();
+    const response = { success: true, data: orderStatusData, message: '訂單狀態分布獲取成功' };
+    res.json(response);
+  } catch (error) {
+    logger.error('獲取訂單狀態分布失敗:', error);
+    res.status(500).json({ success: false, message: '獲取訂單狀態分布失敗', error: error.message });
+  }
+};
+
+// 獲取熱門商品排行榜
+const getPopularProducts = async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    console.log(`獲取熱門商品排行榜: limit=${limit}`);
+    logger.info(`獲取熱門商品排行榜: limit=${limit}`);
+    const popularProducts = await getPopularProductsData(parseInt(limit));
+    console.log('熱門商品數據:', popularProducts);
+    const response = { success: true, data: popularProducts, message: '熱門商品排行榜獲取成功' };
+    res.json(response);
+  } catch (error) {
+    console.error('獲取熱門商品排行榜失敗:', error);
+    logger.error('獲取熱門商品排行榜失敗:', error);
+    res.status(500).json({ success: false, message: '獲取熱門商品排行榜失敗', error: error.message });
+  }
 };
 
 // 獲取即時資料
@@ -220,6 +274,9 @@ module.exports = {
   getOverview,
   getStats,
   getSummary,
+  getDailySalesTrend,
+  getOrderStatusDistribution,
+  getPopularProducts,
   getRealtime,
   getMetrics,
   getTrends,
@@ -238,4 +295,49 @@ module.exports = {
   createReport,
   getReport,
   getSettings
+};
+
+// 獲取用戶行為分析
+const getUserBehavior = async (req, res) => {
+  try {
+    const { limit = 100 } = req.query;
+    logger.info(`獲取用戶行為分析: limit=${limit}`);
+    
+    const behaviorData = await getUserBehaviorData(parseInt(limit));
+    
+    res.json({
+      success: true,
+      data: behaviorData,
+      message: '用戶行為分析獲取成功'
+    });
+  } catch (error) {
+    logger.error('獲取用戶行為分析失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '獲取用戶行為分析失敗',
+      error: error.message
+    });
+  }
+};
+
+// 獲取系統健康監控
+const getSystemHealth = async (req, res) => {
+  try {
+    logger.info('獲取系統健康監控數據');
+    
+    const healthData = await getSystemHealthData();
+    
+    res.json({
+      success: true,
+      data: healthData,
+      message: '系統健康監控數據獲取成功'
+    });
+  } catch (error) {
+    logger.error('獲取系統健康監控失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '獲取系統健康監控失敗',
+      error: error.message
+    });
+  }
 };

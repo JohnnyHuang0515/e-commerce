@@ -22,6 +22,8 @@ import {
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../hooks/useTheme';
+import { HeaderThemeToggle } from '../components/HeaderThemeToggle';
 import './MainLayout.less';
 
 const { Header, Sider, Content } = Layout;
@@ -32,6 +34,7 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   // 選單項目
   const menuItems = [
@@ -191,6 +194,8 @@ const MainLayout: React.FC = () => {
                 icon={<BellOutlined />}
                 className="notification-btn"
               />
+              
+              <HeaderThemeToggle theme={theme} onClick={toggleTheme} />
               
               <Dropdown
                 menu={{

@@ -106,7 +106,7 @@ const Orders: React.FC = () => {
       width: 120,
       render: (total: number) => (
         <span style={{ fontWeight: 500, color: '#1890ff' }}>
-          ¥{total.toFixed(2)}
+          {total.toFixed(2)}
         </span>
       ),
     },
@@ -356,7 +356,7 @@ const Orders: React.FC = () => {
           <Card size="small">
             <div className="stat-item">
               <div className="stat-value" style={{ color: '#722ed1' }}>
-                ¥{(stats.totalRevenue || 0).toLocaleString()}
+                {(stats.totalRevenue || 0).toLocaleString()}
               </div>
               <div className="stat-label">總收入</div>
             </div>
@@ -439,7 +439,7 @@ const Orders: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="訂單金額" span={2}>
                 <span style={{ fontSize: 18, fontWeight: 'bold', color: '#1890ff' }}>
-                  ¥{selectedOrder.total.toFixed(2)}
+                  {selectedOrder.total.toFixed(2)}
                 </span>
               </Descriptions.Item>
             </Descriptions>
@@ -473,8 +473,8 @@ const Orders: React.FC = () => {
                   { title: '商品名稱', dataIndex: 'productName', key: 'productName' },
                   { title: 'SKU', dataIndex: 'sku', key: 'sku' },
                   { title: '數量', dataIndex: 'quantity', key: 'quantity' },
-                  { title: '單價', dataIndex: 'price', key: 'price', render: (price) => `¥${price}` },
-                  { title: '小計', dataIndex: 'total', key: 'total', render: (total) => `¥${total}` },
+                  { title: '單價', dataIndex: 'price', key: 'price', render: (price) => `${price}` },
+                  { title: '小計', dataIndex: 'total', key: 'total', render: (total) => `${total}` },
                 ]}
                 pagination={false}
                 size="small"

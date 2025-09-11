@@ -99,7 +99,7 @@ const Analytics: React.FC = () => {
               <StatCard
                 title="銷售額"
                 value={analytics?.sales?.total || 0}
-                prefix="¥"
+                prefix=""
                 trend={analytics?.sales?.trend ? { 
                   value: analytics.sales.trend, 
                   isPositive: analytics.sales.trend > 0 

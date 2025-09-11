@@ -40,6 +40,7 @@ import {
 } from '@ant-design/icons';
 import { useNotifications, useCreateNotification, useUpdateNotification, useDeleteNotification, useSendNotification } from '../../hooks/useApi';
 import { Notification, NotificationCreateRequest, NotificationUpdateRequest } from '../../services/notificationService';
+// 移除複雜的動畫組件
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;

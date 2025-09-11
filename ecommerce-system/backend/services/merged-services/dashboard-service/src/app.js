@@ -10,7 +10,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'
 // MongoDB 連接
 const connectMongoDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://admin:password123@mongodb:27017/ecommerce_dashboard?authSource=admin';
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://admin:password123@mongodb:27017/ecommerce?authSource=admin';
     
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
