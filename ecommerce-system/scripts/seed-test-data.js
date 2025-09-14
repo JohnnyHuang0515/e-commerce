@@ -197,10 +197,11 @@ async function seed() {
     // --- 新增庫存資料 (PostgreSQL) ---
     console.log('🔄 正在新增庫存資料...');
     for (const product of allProducts) {
+        const productUuid = uuidv4(); // 生成 UUID 作為庫存記錄的產品 ID
         await pgClient.query(
             `INSERT INTO inventory (product_id, sku, quantity, reserved_quantity, reorder_point, status)
              VALUES ($1, $2, $3, $4, $5, 'active') ON CONFLICT (sku) DO NOTHING`,
-            [product._id.toString(), `SKU-${product.name.replace(/\s/g, '')}`, 
+            [productUuid, `SKU-${product.name.replace(/\s/g, '')}`, 
              Math.floor(Math.random() * 100) + 50, Math.floor(Math.random() * 10), 20]
         );
     }
@@ -216,7 +217,7 @@ async function seed() {
     await pgClient.query("DELETE FROM logistics");
     console.log('🧹 舊訂單資料已清理');
     
-    const allCustomers = await pgClient.query("SELECT id FROM users WHERE role = 'CUSTOMER'");
+    const allCustomers = await pgClient.query("SELECT id FROM users WHERE role IN ('CUSTOMER', 'customer')");
     const productsForOrders = await Product.find();
 
     console.log(`📊 找到 ${allCustomers.rows.length} 個客戶，${productsForOrders.length} 個商品`);
@@ -320,7 +321,7 @@ async function seed() {
     for (const order of completedOrders.rows) {
         await pgClient.query(
             `INSERT INTO logistics (order_id, shipping_method, carrier, tracking_number, status, shipping_address, estimated_delivery, shipping_cost)
-             VALUES ($1, 'STANDARD', '黑貓宅急便', $2, 'DELIVERED', '{}', NOW() - INTERVAL '2 days', 150) ON CONFLICT DO NOTHING`,
+             VALUES ($1, 'STANDARD', '黑貓宅急便', $2, 'delivered', '{}', NOW() - INTERVAL '2 days', 150) ON CONFLICT DO NOTHING`,
             [order.id, `TRK${order.id.toString().substring(0, 8).toUpperCase()}`]
         );
     }
@@ -350,7 +351,7 @@ async function seed() {
     });
 
     // 生成用戶行為資料
-    const customerIds = await pgClient.query("SELECT id FROM users WHERE role = 'CUSTOMER'");
+    const customerIds = await pgClient.query("SELECT id FROM users WHERE role IN ('CUSTOMER', 'customer')");
     const behaviors = ['view_product', 'add_to_cart', 'purchase', 'search', 'browse_category'];
     const pages = ['home', 'product', 'category', 'cart', 'checkout'];
     

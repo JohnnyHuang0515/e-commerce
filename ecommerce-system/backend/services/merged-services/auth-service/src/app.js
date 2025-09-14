@@ -32,7 +32,7 @@ const PORT = process.env.PORT || 3002;
 // 中間件
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://localhost:3007', 'http://localhost:8080'],
   credentials: true
 }));
 app.use(morgan('combined'));

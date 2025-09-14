@@ -33,7 +33,7 @@ const Login: React.FC = () => {
   const location = useLocation();
   const { login } = useAuth();
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from?.pathname || '/admin';
 
   const handleLogin = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -68,8 +68,8 @@ const Login: React.FC = () => {
 
   const handleDemoLogin = () => {
     form.setFieldsValue({
-      username: 'admin@example.com',
-      password: 'Admin123',
+      username: 'admin@ecommerce.com',
+      password: 'password123',
     });
   };
 
@@ -155,7 +155,7 @@ const Login: React.FC = () => {
                   </Button>
                   <div className="demo-info">
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                      演示帳號: admin@example.com / Admin123
+                      演示帳號: admin@ecommerce.com / password123
                     </Text>
                   </div>
                 </div>
