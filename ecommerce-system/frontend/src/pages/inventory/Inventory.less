@@ -1,0 +1,188 @@
+/* 深色主題 Modal 樣式 */
+.dark-modal {
+  .ant-modal-content {
+    background-color: #1f1f1f !important;
+    border: 1px solid #404040 !important;
+    border-radius: 8px !important;
+  }
+  
+  .ant-modal-header {
+    background-color: #2d2d2d !important;
+    border-bottom: 1px solid #404040 !important;
+    border-radius: 8px 8px 0 0 !important;
+  }
+  
+  .ant-modal-title {
+    color: #fff !important;
+  }
+  
+  .ant-modal-body {
+    background-color: #1f1f1f !important;
+    color: #fff !important;
+  }
+  
+  .ant-modal-footer {
+    background-color: #1f1f1f !important;
+    border-top: 1px solid #404040 !important;
+    border-radius: 0 0 8px 8px !important;
+  }
+  
+  .ant-modal-close {
+    color: #fff !important;
+    
+    &:hover {
+      color: #b0b0b0 !important;
+    }
+  }
+  
+  .ant-modal-mask {
+    background-color: rgba(0, 0, 0, 0.8) !important;
+  }
+}
+
+/* 深色主題表格樣式 */
+.dark-table {
+  .ant-table {
+    background-color: transparent !important;
+    color: #fff !important;
+  }
+  
+  .ant-table-thead > tr > th {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-bottom: 1px solid #404040 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+  }
+  
+  .ant-table-tbody > tr > td {
+    background-color: transparent !important;
+    border-bottom: 1px solid #333 !important;
+    color: #fff !important;
+  }
+  
+  .ant-table-tbody > tr:hover > td {
+    background-color: rgba(45, 45, 45, 0.5) !important;
+  }
+  
+  .ant-table-tbody > tr.ant-table-row-selected > td {
+    background-color: rgba(24, 144, 255, 0.2) !important;
+  }
+  
+  .ant-table-pagination {
+    .ant-pagination-item {
+      background-color: transparent !important;
+      border-color: #404040 !important;
+      
+      a {
+        color: #fff !important;
+      }
+      
+      &:hover {
+        border-color: #1890ff !important;
+        
+        a {
+          color: #1890ff !important;
+        }
+      }
+      
+      &.ant-pagination-item-active {
+        background-color: #1890ff !important;
+        border-color: #1890ff !important;
+        
+        a {
+          color: #fff !important;
+        }
+      }
+    }
+    
+    .ant-pagination-prev,
+    .ant-pagination-next {
+      background-color: transparent !important;
+      border-color: #404040 !important;
+      color: #fff !important;
+      
+      &:hover {
+        border-color: #1890ff !important;
+        color: #1890ff !important;
+      }
+    }
+    
+    .ant-pagination-jump-prev,
+    .ant-pagination-jump-next {
+      color: #fff !important;
+      
+      &:hover {
+        color: #1890ff !important;
+      }
+    }
+    
+    .ant-pagination-options {
+      .ant-select-selector {
+        background-color: transparent !important;
+        border-color: #404040 !important;
+        color: #fff !important;
+      }
+      
+      .ant-select-arrow {
+        color: #fff !important;
+      }
+    }
+  }
+}
+
+/* 深色主題 Alert 樣式 */
+.dark-alert {
+  .ant-alert-message {
+    color: #fff !important;
+  }
+  
+  .ant-alert-icon {
+    color: #fff !important;
+  }
+  
+  &.ant-alert-error {
+    background-color: rgba(255, 77, 79, 0.1) !important;
+    border-color: #ff4d4f !important;
+    
+    .ant-alert-message {
+      color: #ff4d4f !important;
+    }
+    
+    .ant-alert-icon {
+      color: #ff4d4f !important;
+    }
+  }
+  
+  &.ant-alert-warning {
+    background-color: rgba(250, 173, 20, 0.1) !important;
+    border-color: #faad14 !important;
+    
+    .ant-alert-message {
+      color: #faad14 !important;
+    }
+    
+    .ant-alert-icon {
+      color: #faad14 !important;
+    }
+  }
+}
+
+/* 確保 Modal 內容區域也是深色 */
+.ant-modal-content {
+  background-color: #1f1f1f !important;
+}
+
+.ant-modal-header {
+  background-color: #2d2d2d !important;
+  border-bottom: 1px solid #404040 !important;
+}
+
+.ant-modal-body {
+  background-color: #1f1f1f !important;
+  color: #fff !important;
+}
+
+.ant-modal-footer {
+  background-color: #1f1f1f !important;
+  border-top: 1px solid #404040 !important;
+}

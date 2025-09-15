@@ -17,6 +17,7 @@ import {
   Row,
   Col,
   Alert,
+  Descriptions,
 } from 'antd';
 import {
   PlusOutlined,
@@ -39,6 +40,7 @@ import {
 } from '../../hooks/useApi';
 import type { Inventory, InventoryCreateRequest } from '../../services/inventoryService';
 import type { ColumnsType } from 'antd/es/table';
+import './Inventory.less';
 
 const { Option } = Select;
 
@@ -65,14 +67,200 @@ const Inventory: React.FC = () => {
     setIsModalVisible(true);
   };
 
+  const handleView = (inventory: Inventory) => {
+    const stock = inventory.stock_quantity || 0;
+    let stockStatus = '正常';
+    let stockColor = '#52c41a';
+    
+    if (stock === 0) {
+      stockStatus = '缺貨';
+      stockColor = '#ff4d4f';
+    } else if (stock <= 5) {
+      stockStatus = '庫存不足';
+      stockColor = '#ff4d4f';
+    } else if (stock <= 10) {
+      stockStatus = '庫存偏低';
+      stockColor = '#faad14';
+    }
+
+    Modal.info({
+      title: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ color: '#fff' }}>庫存詳情</span>
+          <Tag color={inventory.status === 1 ? 'green' : 'red'}>
+            {inventory.status === 1 ? '上架' : '下架'}
+          </Tag>
+        </div>
+      ),
+      width: 700,
+      className: 'dark-modal',
+      styles: {
+        body: {
+          backgroundColor: '#1f1f1f',
+          color: '#fff'
+        },
+        header: {
+          backgroundColor: '#2d2d2d',
+          borderBottom: '1px solid #404040',
+          color: '#fff'
+        },
+        mask: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)'
+        },
+        content: {
+          backgroundColor: '#1f1f1f',
+          border: '1px solid #404040',
+          borderRadius: '8px'
+        }
+      },
+      content: (
+        <div style={{ padding: '8px 0', backgroundColor: '#1f1f1f', color: '#fff' }}>
+          {/* 商品基本信息 */}
+          <div style={{ marginBottom: '24px' }}>
+            <h4 style={{ margin: '0 0 16px 0', color: '#a0a0a0', fontSize: '16px', fontWeight: '500' }}>
+              📦 商品信息
+            </h4>
+            <Descriptions 
+              column={2} 
+              size="small"
+              labelStyle={{ color: '#b0b0b0', fontSize: '14px' }}
+              contentStyle={{ color: '#fff', fontSize: '14px' }}
+            >
+              <Descriptions.Item label="商品名稱" span={2}>
+                <span style={{ fontWeight: 'bold', fontSize: '16px' }}>{inventory.name}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="商品ID">
+                <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{inventory.product_id}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="SKU">
+                <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{inventory.sku}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="分類">
+                <Tag color="blue">{inventory.category_name}</Tag>
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+
+          {/* 庫存信息 - 緊湊設計 */}
+          <div style={{ marginBottom: '24px' }}>
+            <h4 style={{ margin: '0 0 16px 0', color: '#a0a0a0', fontSize: '16px', fontWeight: '500' }}>
+              📊 庫存信息
+            </h4>
+            
+            <Row gutter={[16, 16]}>
+              {/* 當前庫存 - 主要信息 */}
+              <Col span={16}>
+                <div style={{ 
+                  padding: '16px', 
+                  backgroundColor: '#2d2d2d', 
+                  borderRadius: '8px',
+                  border: `2px solid ${stockColor}`,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#b0b0b0', marginBottom: '4px' }}>
+                        當前庫存
+                      </div>
+                      <div style={{ 
+                        fontSize: '24px', 
+                        fontWeight: 'bold', 
+                        color: stockColor,
+                        marginBottom: '4px'
+                      }}>
+                        {stock}
+                      </div>
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: stockColor,
+                        fontWeight: '500'
+                      }}>
+                        {stockStatus}
+                      </div>
+                    </div>
+                    <div style={{ 
+                      fontSize: '32px', 
+                      color: stockColor,
+                      opacity: 0.3
+                    }}>
+                      📦
+                    </div>
+                  </div>
+                </div>
+              </Col>
+              
+              {/* 最小庫存閾值 */}
+              <Col span={8}>
+                <div style={{ 
+                  padding: '16px', 
+                  backgroundColor: '#2d2d2d', 
+                  borderRadius: '8px',
+                  border: '1px solid #404040',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#b0b0b0', marginBottom: '8px' }}>
+                    最小庫存閾值
+                  </div>
+                  <div style={{ 
+                    fontSize: '20px', 
+                    fontWeight: 'bold', 
+                    color: '#fff',
+                    marginBottom: '4px'
+                  }}>
+                    {inventory.min_stock_level || 10}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#666' }}>
+                    低於此值將警告
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* 其他信息 */}
+          <div>
+            <h4 style={{ margin: '0 0 16px 0', color: '#a0a0a0', fontSize: '16px', fontWeight: '500' }}>
+              ℹ️ 其他信息
+            </h4>
+            <Descriptions 
+              column={2} 
+              size="small"
+              labelStyle={{ color: '#b0b0b0', fontSize: '14px' }}
+              contentStyle={{ color: '#fff', fontSize: '14px' }}
+            >
+              <Descriptions.Item label="最後更新">
+                <span style={{ fontWeight: '500' }}>
+                  {inventory.last_updated ? new Date(inventory.last_updated).toLocaleString() : '無記錄'}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="商品狀態">
+                <Tag color={inventory.status === 1 ? 'green' : 'red'}>
+                  {inventory.status === 1 ? '上架中' : '已下架'}
+                </Tag>
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        </div>
+      ),
+    });
+  };
+
   const handleEdit = (inventory: Inventory) => {
     setEditingInventory(inventory);
     form.setFieldsValue({
       ...inventory,
-      'location.warehouse': inventory.location.warehouse,
-      'location.aisle': inventory.location.aisle,
-      'location.shelf': inventory.location.shelf,
-      'location.bin': inventory.location.bin,
+      'location.warehouse': inventory.location?.warehouse || '',
+      'location.aisle': inventory.location?.aisle || '',
+      'location.shelf': inventory.location?.shelf || '',
+      'location.bin': inventory.location?.bin || '',
     });
     setIsModalVisible(true);
   };
@@ -153,6 +341,14 @@ const Inventory: React.FC = () => {
     setSearchParams(values);
   };
 
+  const handleTableChange = (pagination: any) => {
+    setSearchParams(prev => ({
+      ...prev,
+      page: pagination.current,
+      limit: pagination.pageSize,
+    }));
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       active: 'green',
@@ -178,133 +374,109 @@ const Inventory: React.FC = () => {
     return { status: 'processing', text: '正常' };
   };
 
-  const columns: ColumnsType<Inventory> = [
-    {
-      title: '庫存ID',
-      dataIndex: '_id',
-      key: '_id',
-      width: 100,
-      render: (id: string) => (
-        <Tooltip title={id}>
-          <span style={{ fontFamily: 'monospace' }}>{id.slice(-8)}</span>
-        </Tooltip>
-      ),
-    },
+  const columns: ColumnsType<any> = [
     {
       title: '商品ID',
-      dataIndex: 'productId',
-      key: 'productId',
+      dataIndex: 'product_id',
+      key: 'product_id',
       width: 100,
       render: (productId: string) => (
         <Tooltip title={productId}>
-          <span style={{ fontFamily: 'monospace' }}>{productId.slice(-8)}</span>
+          <span style={{ fontFamily: 'monospace' }}>{productId}</span>
         </Tooltip>
       ),
     },
     {
-      title: 'SKU',
-      dataIndex: 'sku',
-      key: 'sku',
-      width: 120,
-      render: (sku: string) => (
-        <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
-          {sku}
-        </span>
+      title: '商品信息',
+      key: 'productInfo',
+      width: 200,
+      render: (_, record: any) => (
+        <div>
+          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+            {record.name}
+          </div>
+          <div style={{ 
+            fontSize: '12px', 
+            color: '#b0b0b0', 
+            fontFamily: 'monospace',
+            backgroundColor: 'rgba(45, 45, 45, 0.8)',
+            border: '1px solid #404040',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            display: 'inline-block'
+          }}>
+            SKU: {record.sku}
+          </div>
+        </div>
       ),
     },
     {
-      title: '庫存狀態',
-      key: 'stockStatus',
+      title: '分類',
+      dataIndex: 'category_name',
+      key: 'category_name',
       width: 120,
-      render: (_, record: Inventory) => {
-        const stockStatus = getStockStatus(record);
-        return (
-          <Badge 
-            status={stockStatus.status as any} 
-            text={stockStatus.text}
-          />
-        );
-      },
+      render: (categoryName: string) => (
+        <Tag color="blue">{categoryName}</Tag>
+      ),
     },
     {
       title: '當前庫存',
-      dataIndex: 'stock',
-      key: 'stock',
-      width: 100,
-      render: (stock: number, record: Inventory) => (
-        <div>
-          <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
-            {stock}
-          </div>
-          <div style={{ fontSize: '12px', color: '#666' }}>
-            可用: {record.availableStock}
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '預留庫存',
-      dataIndex: 'reservedStock',
-      key: 'reservedStock',
-      width: 100,
-      render: (reservedStock: number) => (
-        <span style={{ color: '#ff7875' }}>
-          {reservedStock}
-        </span>
-      ),
-    },
-    {
-      title: '庫存範圍',
-      key: 'stockRange',
+      dataIndex: 'stock_quantity',
+      key: 'stock_quantity',
       width: 120,
-      render: (_, record: Inventory) => (
-        <div style={{ fontSize: '12px' }}>
-          <div>最小: {record.minStock}</div>
-          <div>最大: {record.maxStock}</div>
-          <div>補貨點: {record.reorderPoint}</div>
-        </div>
-      ),
+      render: (stock: number) => {
+        let color = '#52c41a'; // 綠色 - 正常
+        let statusText = '';
+        
+        if (stock === 0) {
+          color = '#ff4d4f'; // 紅色 - 缺貨
+          statusText = ' (缺貨)';
+        } else if (stock <= 5) {
+          color = '#ff4d4f'; // 紅色 - 庫存不足
+          statusText = ' (不足)';
+        } else if (stock <= 10) {
+          color = '#faad14'; // 橙色 - 庫存偏低
+          statusText = ' (偏低)';
+        }
+        
+        return (
+          <div style={{ 
+            fontWeight: 'bold', 
+            fontSize: '16px', 
+            color: color,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span>{stock}</span>
+            {statusText && (
+              <span style={{ 
+                fontSize: '12px', 
+                fontWeight: 'normal',
+                color: color
+              }}>
+                {statusText}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: '狀態',
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (status: string) => (
-        <Tag color={getStatusColor(status)}>
-          {getStatusText(status)}
+      render: (status: number) => (
+        <Tag color={status === 1 ? 'green' : 'red'}>
+          {status === 1 ? '上架' : '下架'}
         </Tag>
       ),
     },
     {
-      title: '倉庫位置',
-      dataIndex: 'location',
-      key: 'location',
-      width: 150,
-      render: (location: any) => (
-        <div>
-          <div>{location.warehouse}</div>
-          {location.aisle && <div style={{ fontSize: '12px', color: '#666' }}>
-            {location.aisle} - {location.shelf} - {location.bin}
-          </div>}
-        </div>
-      ),
-    },
-    {
-      title: '成本',
-      dataIndex: 'cost',
-      key: 'cost',
-      width: 100,
-      render: (cost: number, record: Inventory) => (
-        <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
-          {record.currency} {cost.toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      title: '最後補貨',
-      dataIndex: 'lastRestocked',
-      key: 'lastRestocked',
+      title: '最後更新',
+      dataIndex: 'last_updated',
+      key: 'last_updated',
       width: 120,
       render: (date: string) => (
         date ? new Date(date).toLocaleDateString() : '-'
@@ -313,22 +485,15 @@ const Inventory: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 180,
+      width: 120,
       fixed: 'right',
-      render: (_, record: Inventory) => (
+      render: (_, record: any) => (
         <Space size="small">
           <Tooltip title="查看詳情">
             <Button
               type="text"
               icon={<EyeOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="編輯">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
+              onClick={() => handleView(record)}
             />
           </Tooltip>
           <Tooltip title="庫存調整">
@@ -338,27 +503,25 @@ const Inventory: React.FC = () => {
               onClick={() => handleAdjustStock(record)}
             />
           </Tooltip>
-          <Popconfirm
-            title="確定要刪除這個庫存記錄嗎？"
-            onConfirm={() => handleDelete(record._id)}
-            okText="確定"
-            cancelText="取消"
-          >
-            <Tooltip title="刪除">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
         </Space>
       ),
     },
   ];
 
   return (
-    <div>
+    <div style={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)',
+      padding: '24px'
+    }}>
+      {/* 頁面標題 */}
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>庫存管理</h2>
+        <p style={{ margin: '8px 0 0 0', color: '#b0b0b0', fontSize: '14px' }}>
+          查看和管理商品庫存狀態、庫存數量及庫存警告
+        </p>
+      </div>
+
       {/* 警告提示 */}
       {(lowStockAlerts?.data?.length > 0 || outOfStockAlerts?.data?.length > 0) && (
         <div style={{ marginBottom: 16 }}>
@@ -367,7 +530,13 @@ const Inventory: React.FC = () => {
               message={`有 ${outOfStockAlerts.data.length} 個商品缺貨`}
               type="error"
               icon={<WarningOutlined />}
-              style={{ marginBottom: 8 }}
+              style={{ 
+                marginBottom: 8,
+                backgroundColor: 'rgba(255, 77, 79, 0.1)',
+                border: '1px solid #ff4d4f',
+                borderRadius: '6px'
+              }}
+              className="dark-alert"
             />
           )}
           {lowStockAlerts?.data?.length > 0 && (
@@ -375,21 +544,32 @@ const Inventory: React.FC = () => {
               message={`有 ${lowStockAlerts.data.length} 個商品庫存不足`}
               type="warning"
               icon={<WarningOutlined />}
+              style={{ 
+                backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                border: '1px solid #faad14',
+                borderRadius: '6px'
+              }}
+              className="dark-alert"
             />
           )}
         </div>
       )}
 
-      <Card>
+      <Card 
+        style={{ 
+          backgroundColor: 'rgba(45, 45, 45, 0.8)',
+          border: '1px solid #404040',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(10px)'
+        }}
+        bodyStyle={{ 
+          backgroundColor: 'transparent',
+          padding: '24px'
+        }}
+      >
         <div style={{ marginBottom: 16 }}>
           <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAdd}
-            >
-              新增庫存
-            </Button>
             <Button
               icon={<ReloadOutlined />}
               onClick={() => refetch()}
@@ -404,26 +584,13 @@ const Inventory: React.FC = () => {
           onFinish={handleSearch}
           style={{ marginBottom: 16 }}
         >
-          <Form.Item name="status">
-            <Select placeholder="庫存狀態" allowClear style={{ width: 120 }}>
-              <Option value="active">正常</Option>
-              <Option value="inactive">停用</Option>
-              <Option value="discontinued">停產</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="warehouse">
-            <Input placeholder="倉庫" style={{ width: 120 }} />
+          <Form.Item name="search">
+            <Input placeholder="搜尋商品名稱或SKU" style={{ width: 200 }} />
           </Form.Item>
           <Form.Item name="lowStock">
-            <Select placeholder="庫存警告" allowClear style={{ width: 120 }}>
+            <Select placeholder="庫存狀態" allowClear style={{ width: 120 }}>
               <Option value="true">庫存不足</Option>
               <Option value="false">庫存充足</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="outOfStock">
-            <Select placeholder="缺貨狀態" allowClear style={{ width: 120 }}>
-              <Option value="true">缺貨</Option>
-              <Option value="false">有庫存</Option>
             </Select>
           </Form.Item>
           <Form.Item>
@@ -437,8 +604,12 @@ const Inventory: React.FC = () => {
           columns={columns}
           dataSource={inventoriesData?.data?.items || []}
           loading={isLoading}
-          rowKey="_id"
-          scroll={{ x: 1500 }}
+          rowKey="public_id"
+          onChange={handleTableChange}
+          style={{
+            backgroundColor: 'transparent'
+          }}
+          className="dark-table"
           pagination={{
             total: inventoriesData?.data?.total || 0,
             pageSize: inventoriesData?.data?.limit || 10,
@@ -447,6 +618,15 @@ const Inventory: React.FC = () => {
             showQuickJumper: true,
             showTotal: (total, range) =>
               `第 ${range[0]}-${range[1]} 項，共 ${total} 項`,
+            itemRender: (current, type, originalElement) => {
+              if (type === 'prev') {
+                return <Button style={{ color: '#fff', borderColor: '#404040' }}>上一頁</Button>;
+              }
+              if (type === 'next') {
+                return <Button style={{ color: '#fff', borderColor: '#404040' }}>下一頁</Button>;
+              }
+              return originalElement;
+            }
           }}
         />
       </Card>

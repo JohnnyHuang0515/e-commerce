@@ -14,7 +14,8 @@ import {
   Modal,
   Descriptions,
   Badge,
-  Form
+  Form,
+  Tooltip
 } from 'antd';
 import { 
   EyeOutlined, 
@@ -104,9 +105,9 @@ const Orders: React.FC = () => {
       dataIndex: 'total',
       key: 'total',
       width: 120,
-      render: (total: number) => (
+      render: (total: number | string) => (
         <span style={{ fontWeight: 500, color: '#1890ff' }}>
-          {total.toFixed(2)}
+          {Number(total).toFixed(2)}
         </span>
       ),
     },
@@ -122,7 +123,7 @@ const Orders: React.FC = () => {
           failed: { color: 'red', text: '支付失敗' },
           refunded: { color: 'blue', text: '已退款' },
         };
-        const config = statusConfig[status as keyof typeof statusConfig];
+        const config = statusConfig[status as keyof typeof statusConfig] || { color: 'default', text: status };
         return <Tag color={config.color}>{config.text}</Tag>;
       },
     },
@@ -136,12 +137,13 @@ const Orders: React.FC = () => {
           pending: { color: 'orange', text: '待確認' },
           confirmed: { color: 'blue', text: '已確認' },
           processing: { color: 'purple', text: '處理中' },
+          completed: { color: 'green', text: '已完成' },
           shipped: { color: 'cyan', text: '已發貨' },
           delivered: { color: 'green', text: '已送達' },
           cancelled: { color: 'red', text: '已取消' },
           returned: { color: 'volcano', text: '已退貨' },
         };
-        const config = statusConfig[status as keyof typeof statusConfig];
+        const config = statusConfig[status as keyof typeof statusConfig] || { color: 'default', text: status };
         return <Tag color={config.color}>{config.text}</Tag>;
       },
     },
@@ -158,12 +160,14 @@ const Orders: React.FC = () => {
       width: 200,
       render: (_: any, record: any) => (
         <Space size="small">
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            size="small"
-            onClick={() => handleViewDetail(record)}
-          />
+          <Tooltip title="查看訂單詳情">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              size="small"
+              onClick={() => handleViewDetail(record)}
+            />
+          </Tooltip>
           {record.status === 'pending' && (
             <Popconfirm
               title="確定要確認這個訂單嗎？"
@@ -171,42 +175,48 @@ const Orders: React.FC = () => {
               okText="確定"
               cancelText="取消"
             >
-              <Button
-                type="text"
-                icon={<CheckOutlined />}
-                size="small"
-                style={{ color: '#52c41a' }}
-              />
+              <Tooltip title="確認訂單">
+                <Button
+                  type="text"
+                  icon={<CheckOutlined />}
+                  size="small"
+                  style={{ color: '#52c41a' }}
+                />
+              </Tooltip>
             </Popconfirm>
           )}
-          {record.status === 'confirmed' && (
+          {record.status === 'processing' && (
             <Popconfirm
               title="確定要發貨嗎？"
               onConfirm={() => handleShipOrder(record.id)}
               okText="確定"
               cancelText="取消"
             >
-              <Button
-                type="text"
-                icon={<TruckOutlined />}
-                size="small"
-                style={{ color: '#1890ff' }}
-              />
+              <Tooltip title="發貨">
+                <Button
+                  type="text"
+                  icon={<TruckOutlined />}
+                  size="small"
+                  style={{ color: '#1890ff' }}
+                />
+              </Tooltip>
             </Popconfirm>
           )}
-          {['pending', 'confirmed'].includes(record.status) && (
+          {['pending', 'processing'].includes(record.status) && (
             <Popconfirm
               title="確定要取消這個訂單嗎？"
               onConfirm={() => handleCancelOrder(record.id)}
               okText="確定"
               cancelText="取消"
             >
-              <Button
-                type="text"
-                icon={<CloseOutlined />}
-                size="small"
-                danger
-              />
+              <Tooltip title="取消訂單">
+                <Button
+                  type="text"
+                  icon={<CloseOutlined />}
+                  size="small"
+                  danger
+                />
+              </Tooltip>
             </Popconfirm>
           )}
         </Space>
@@ -240,7 +250,7 @@ const Orders: React.FC = () => {
 
   const handleConfirmOrder = async (orderId: string) => {
     try {
-      await updateOrderMutation.mutateAsync({ orderId, status: 'confirmed' });
+      await updateOrderMutation.mutateAsync({ orderId, status: 'processing' });
       message.success('訂單確認成功');
       refetch();
     } catch (error: any) {
@@ -305,7 +315,7 @@ const Orders: React.FC = () => {
   return (
     <div className="orders-page">
       <PageHeader
-        title="訂單管理"
+        title="訂單清單"
         subtitle="管理訂單狀態和物流信息"
         extra={
           <Space>
@@ -439,7 +449,7 @@ const Orders: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="訂單金額" span={2}>
                 <span style={{ fontSize: 18, fontWeight: 'bold', color: '#1890ff' }}>
-                  {selectedOrder.total.toFixed(2)}
+                  {Number(selectedOrder.total).toFixed(2)}
                 </span>
               </Descriptions.Item>
             </Descriptions>

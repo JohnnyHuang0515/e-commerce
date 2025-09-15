@@ -1,62 +1,283 @@
-@import "@/styles/variables.less";
-
-// 🛍️ 商品管理頁面樣式
-
-.products-page {
-  .products-content {
-    .products-filters {
-      margin-bottom: @spacing-6;
-      padding: @spacing-4;
-      background: @bg-primary;
-      border-radius: @radius-lg;
-      border: 1px solid @border-secondary;
+/* 深色主題搜索框樣式 */
+.dark-search {
+  .ant-input {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: #404040 !important;
+    color: #fff !important;
+    
+    &::placeholder {
+      color: #999 !important;
+    }
+    
+    &:focus {
+      border-color: #1890ff !important;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+    }
+  }
+  
+  .ant-input-search-button {
+    background-color: #1890ff !important;
+    border-color: #1890ff !important;
+    color: #fff !important;
+    
+    &:hover {
+      background-color: #40a9ff !important;
+      border-color: #40a9ff !important;
     }
   }
 }
 
-// 響應式設計
-@media (max-width: @screen-sm) {
-  .products-page {
-    .products-content {
-      .products-filters {
-        padding: @spacing-3;
+/* 深色主題選擇器樣式 */
+.dark-select {
+  .ant-select-selector {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: #404040 !important;
+    color: #fff !important;
+  }
+  
+  .ant-select-selection-placeholder {
+    color: #999 !important;
+  }
+  
+  .ant-select-selection-item {
+    color: #fff !important;
+  }
+  
+  .ant-select-arrow {
+    color: #fff !important;
+  }
+  
+  &:hover .ant-select-selector {
+    border-color: #1890ff !important;
+  }
+  
+  &.ant-select-focused .ant-select-selector {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  }
+}
+
+/* 深色主題下拉選項 */
+.ant-select-dropdown {
+  background-color: #2d2d2d !important;
+  border: 1px solid #404040 !important;
+  border-radius: 6px !important;
+  
+  .ant-select-item {
+    color: #fff !important;
+    
+    &:hover {
+      background-color: rgba(45, 45, 45, 0.8) !important;
+    }
+    
+    &.ant-select-item-option-selected {
+      background-color: #1890ff !important;
+      color: #fff !important;
+    }
+  }
+}
+
+/* 深色主題表格樣式 */
+.dark-table {
+  .ant-table {
+    background-color: transparent !important;
+    color: #fff !important;
+  }
+  
+  .ant-table-thead > tr > th {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-bottom: 1px solid #404040 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+  }
+  
+  .ant-table-tbody > tr > td {
+    background-color: transparent !important;
+    border-bottom: 1px solid #333 !important;
+    color: #fff !important;
+  }
+  
+  .ant-table-tbody > tr:hover > td {
+    background-color: rgba(45, 45, 45, 0.5) !important;
+  }
+  
+  .ant-table-tbody > tr.ant-table-row-selected > td {
+    background-color: rgba(24, 144, 255, 0.2) !important;
+  }
+  
+  .ant-table-pagination {
+    .ant-pagination-item {
+      background-color: transparent !important;
+      border-color: #404040 !important;
+      
+      a {
+        color: #fff !important;
+      }
+      
+      &:hover {
+        border-color: #1890ff !important;
         
-        .ant-row {
-          .ant-col {
-            margin-bottom: @spacing-2;
-          }
+        a {
+          color: #1890ff !important;
         }
+      }
+      
+      &.ant-pagination-item-active {
+        background-color: #1890ff !important;
+        border-color: #1890ff !important;
+        
+        a {
+          color: #fff !important;
+        }
+      }
+    }
+    
+    .ant-pagination-prev,
+    .ant-pagination-next {
+      background-color: transparent !important;
+      border-color: #404040 !important;
+      color: #fff !important;
+      
+      &:hover {
+        border-color: #1890ff !important;
+        color: #1890ff !important;
+      }
+    }
+    
+    .ant-pagination-jump-prev,
+    .ant-pagination-jump-next {
+      color: #fff !important;
+      
+      &:hover {
+        color: #1890ff !important;
+      }
+    }
+    
+    .ant-pagination-options {
+      .ant-select-selector {
+        background-color: transparent !important;
+        border-color: #404040 !important;
+        color: #fff !important;
+      }
+      
+      .ant-select-arrow {
+        color: #fff !important;
       }
     }
   }
 }
 
-// 表格樣式優化
-.products-page {
-  .ant-table {
-    .ant-table-thead > tr > th {
-      background: @bg-secondary;
-      font-weight: @font-weight-semibold;
+/* 深色主題 Modal 樣式 */
+.dark-modal {
+  .ant-modal-content {
+    background-color: #1f1f1f !important;
+    border: 1px solid #404040 !important;
+    border-radius: 8px !important;
+  }
+  
+  .ant-modal-header {
+    background-color: #2d2d2d !important;
+    border-bottom: 1px solid #404040 !important;
+    border-radius: 8px 8px 0 0 !important;
+  }
+  
+  .ant-modal-title {
+    color: #fff !important;
+  }
+  
+  .ant-modal-body {
+    background-color: #1f1f1f !important;
+    color: #fff !important;
+  }
+  
+  .ant-modal-footer {
+    background-color: #1f1f1f !important;
+    border-top: 1px solid #404040 !important;
+    border-radius: 0 0 8px 8px !important;
+  }
+  
+  .ant-modal-close {
+    color: #fff !important;
+    
+    &:hover {
+      color: #b0b0b0 !important;
+    }
+  }
+  
+  .ant-modal-mask {
+    background-color: rgba(0, 0, 0, 0.8) !important;
+  }
+}
+
+/* 深色主題表單樣式 */
+.dark-form {
+  .ant-form-item-label > label {
+    color: #fff !important;
+  }
+  
+  .ant-input {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: #404040 !important;
+    color: #fff !important;
+    
+    &::placeholder {
+      color: #999 !important;
     }
     
-    .ant-table-tbody > tr:hover > td {
-      background: @bg-secondary;
+    &:focus {
+      border-color: #1890ff !important;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+    }
+  }
+  
+  .ant-select-selector {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: #404040 !important;
+    color: #fff !important;
+  }
+  
+  .ant-select-arrow {
+    color: #fff !important;
+  }
+  
+  .ant-input-number {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: #404040 !important;
+    color: #fff !important;
+    
+    .ant-input-number-input {
+      background-color: transparent !important;
+      color: #fff !important;
+    }
+  }
+  
+  .ant-textarea {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: #404040 !important;
+    color: #fff !important;
+    
+    &::placeholder {
+      color: #999 !important;
     }
   }
 }
 
-// 標籤樣式
-.products-page {
-  .ant-tag {
-    border-radius: @radius-sm;
-    font-size: @font-size-xs;
-  }
+/* 確保 Modal 內容區域也是深色 */
+.ant-modal-content {
+  background-color: #1f1f1f !important;
 }
 
-// 圖片樣式
-.products-page {
-  .ant-image {
-    border-radius: @radius-sm;
-    overflow: hidden;
-  }
+.ant-modal-header {
+  background-color: #2d2d2d !important;
+  border-bottom: 1px solid #404040 !important;
+}
+
+.ant-modal-body {
+  background-color: #1f1f1f !important;
+  color: #fff !important;
+}
+
+.ant-modal-footer {
+  background-color: #1f1f1f !important;
+  border-top: 1px solid #404040 !important;
 }

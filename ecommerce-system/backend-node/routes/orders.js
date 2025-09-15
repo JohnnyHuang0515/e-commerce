@@ -55,7 +55,7 @@ router.get('/', authenticateToken, checkPermission('view_orders'), asyncHandler(
   let paramIndex = 1;
   
   if (status) {
-    whereClause += ` AND o.order_status = $${paramIndex}`;
+    whereClause += ` AND o.status = $${paramIndex}`;
     queryParams.push(status);
     paramIndex++;
   }
@@ -73,16 +73,26 @@ router.get('/', authenticateToken, checkPermission('view_orders'), asyncHandler(
   // 查詢訂單列表
   const result = await postgresPool.query(`
     SELECT 
-      o.order_id,
+      o.order_id as id,
       o.public_id,
-      o.user_id,
-      o.order_status,
-      o.total_amount,
+      o.public_id as "orderNumber",
+      o.user_id as "userId",
+      LOWER(o.status) as status,
+      o.total_amount as total,
       o.shipping_address,
-      o.created_at,
-      o.updated_at,
+      o.payment_status as "paymentStatus",
+      o.created_at as "createdAt",
+      o.updated_at as "updatedAt",
       u.name as user_name,
-      u.email as user_email
+      u.email as user_email,
+      '[]'::json as items,
+      json_build_object(
+        'status', o.payment_status,
+        'method', o.payment_method
+      ) as payment,
+      json_build_object(
+        'address', o.shipping_address
+      ) as shipping
     FROM orders o
     LEFT JOIN users u ON o.user_id = u.user_id
     WHERE 1=1 ${whereClause}
@@ -101,12 +111,70 @@ router.get('/', authenticateToken, checkPermission('view_orders'), asyncHandler(
   
   res.json({
     success: true,
-    data: result.rows,
-    pagination: {
+    data: {
+      items: result.rows,
+      total,
       page: parseInt(page),
       limit: parseInt(limit),
-      total,
       pages: Math.ceil(total / limit)
+    }
+  });
+}));
+
+/**
+ * @swagger
+ * /api/v1/orders/stats:
+ *   get:
+ *     summary: 獲取訂單統計
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 獲取成功
+ */
+router.get('/stats', authenticateToken, checkPermission('view_orders'), asyncHandler(async (req, res) => {
+  // 獲取訂單統計
+  const statsResult = await postgresPool.query(`
+    SELECT 
+      COUNT(*) as total_orders,
+      COUNT(CASE WHEN UPPER(status) = 'PENDING' THEN 1 END) as pending_orders,
+      COUNT(CASE WHEN UPPER(status) = 'CONFIRMED' THEN 1 END) as confirmed_orders,
+      COUNT(CASE WHEN UPPER(status) = 'PROCESSING' THEN 1 END) as processing_orders,
+      COUNT(CASE WHEN UPPER(status) = 'SHIPPED' THEN 1 END) as shipped_orders,
+      COUNT(CASE WHEN UPPER(status) = 'DELIVERED' THEN 1 END) as delivered_orders,
+      COUNT(CASE WHEN UPPER(status) = 'COMPLETED' THEN 1 END) as completed_orders,
+      COUNT(CASE WHEN UPPER(status) = 'CANCELLED' THEN 1 END) as cancelled_orders,
+      SUM(total_amount) as total_revenue,
+      AVG(total_amount) as avg_order_value
+    FROM orders
+  `);
+  
+  // 獲取最近 30 天的訂單趨勢
+  const trendResult = await postgresPool.query(`
+    SELECT 
+      DATE(created_at) as date,
+      COUNT(*) as order_count,
+      SUM(total_amount) as daily_revenue
+    FROM orders 
+    WHERE created_at >= NOW() - INTERVAL '30 days'
+    GROUP BY DATE(created_at)
+    ORDER BY date DESC
+    LIMIT 30
+  `);
+
+  const stats = statsResult.rows[0];
+  
+  res.json({
+    success: true,
+    message: '訂單統計獲取成功',
+    data: {
+      total: parseInt(stats.total_orders) || 0,
+      pending: parseInt(stats.pending_orders) || 0,
+      shipped: parseInt(stats.shipped_orders) || 0,
+      totalRevenue: parseFloat(stats.total_revenue) || 0,
+      averageOrderValue: parseFloat(stats.avg_order_value) || 0,
+      trends: trendResult.rows
     }
   });
 }));
@@ -141,7 +209,7 @@ router.get('/:publicId', authenticateToken, checkPermission('view_orders'), asyn
       o.order_id,
       o.public_id,
       o.user_id,
-      o.order_status,
+      o.status,
       o.total_amount,
       o.shipping_address,
       o.created_at,
@@ -319,7 +387,7 @@ router.post('/', authenticateToken, checkPermission('create_order'), asyncHandle
     
     // 創建訂單
     const orderResult = await client.query(`
-      INSERT INTO orders (user_id, order_status, total_amount, shipping_address, public_id)
+      INSERT INTO orders (user_id, status, total_amount, shipping_address, public_id)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING order_id, public_id, total_amount, created_at
     `, [req.user.user_id, 'pending', totalAmount, shipping_address, orderPublicId]);
@@ -428,26 +496,26 @@ router.put('/:publicId/status', authenticateToken, checkPermission('update_order
   const { publicId } = req.params;
   const { status, notes } = req.body;
   
-  const validStatuses = ['pending', 'paid', 'shipped', 'delivered', 'canceled'];
+  const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
   if (!validStatuses.includes(status)) {
     throw new ValidationError('無效的訂單狀態');
   }
   
   // 獲取訂單信息
   const orderResult = await postgresPool.query(`
-    SELECT order_id, order_status FROM orders WHERE public_id = $1
+    SELECT order_id, status FROM orders WHERE public_id = $1
   `, [publicId]);
   
   if (orderResult.rows.length === 0) {
     throw new NotFoundError('訂單不存在');
   }
   
-  const { order_id, order_status: currentStatus } = orderResult.rows[0];
+  const { order_id, status: currentStatus } = orderResult.rows[0];
   
   // 更新訂單狀態
   await postgresPool.query(`
     UPDATE orders
-    SET order_status = $1, updated_at = NOW()
+    SET status = $1, updated_at = NOW()
     WHERE order_id = $2
   `, [status, order_id]);
   
@@ -522,20 +590,20 @@ router.post('/:publicId/cancel', authenticateToken, checkPermission('cancel_orde
   
   // 獲取訂單信息
   const orderResult = await postgresPool.query(`
-    SELECT order_id, order_status FROM orders WHERE public_id = $1
+    SELECT order_id, status FROM orders WHERE public_id = $1
   `, [publicId]);
   
   if (orderResult.rows.length === 0) {
     throw new NotFoundError('訂單不存在');
   }
   
-  const { order_id, order_status } = orderResult.rows[0];
+  const { order_id, status } = orderResult.rows[0];
   
-  if (order_status === 'delivered') {
+  if (status === 'delivered') {
     throw new ValidationError('已完成的訂單無法取消');
   }
   
-  if (order_status === 'canceled') {
+  if (status === 'canceled') {
     throw new ValidationError('訂單已經取消');
   }
   
@@ -547,7 +615,7 @@ router.post('/:publicId/cancel', authenticateToken, checkPermission('cancel_orde
     // 更新訂單狀態
     await client.query(`
       UPDATE orders
-      SET order_status = 'canceled', updated_at = NOW()
+      SET status = 'canceled', updated_at = NOW()
       WHERE order_id = $1
     `, [order_id]);
     
@@ -614,13 +682,13 @@ router.get('/statistics', authenticateToken, checkPermission('view_reports'), as
   const statsResult = await postgresPool.query(`
     SELECT 
       COUNT(*) as total_orders,
-      COUNT(CASE WHEN order_status = 'pending' THEN 1 END) as pending_orders,
-      COUNT(CASE WHEN order_status = 'paid' THEN 1 END) as paid_orders,
-      COUNT(CASE WHEN order_status = 'shipped' THEN 1 END) as shipped_orders,
-      COUNT(CASE WHEN order_status = 'delivered' THEN 1 END) as delivered_orders,
-      COUNT(CASE WHEN order_status = 'canceled' THEN 1 END) as canceled_orders,
-      SUM(CASE WHEN order_status = 'delivered' THEN total_amount ELSE 0 END) as total_revenue,
-      AVG(CASE WHEN order_status = 'delivered' THEN total_amount ELSE NULL END) as avg_order_value
+      COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
+      COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_orders,
+      COUNT(CASE WHEN status = 'shipped' THEN 1 END) as shipped_orders,
+      COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
+      COUNT(CASE WHEN status = 'canceled' THEN 1 END) as canceled_orders,
+      SUM(CASE WHEN status = 'delivered' THEN total_amount ELSE 0 END) as total_revenue,
+      AVG(CASE WHEN status = 'delivered' THEN total_amount ELSE NULL END) as avg_order_value
     FROM orders
   `);
   

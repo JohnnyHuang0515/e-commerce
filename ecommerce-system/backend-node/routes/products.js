@@ -52,7 +52,7 @@ const router = express.Router();
  *         description: 獲取成功
  */
 router.get('/', authenticateToken, checkPermission('view_products'), asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, search = '', category_id, status } = req.query;
+  const { page = 1, limit = 10, search = '', category, category_id, status } = req.query;
   const offset = (page - 1) * limit;
   
   let whereClause = '';
@@ -65,16 +65,22 @@ router.get('/', authenticateToken, checkPermission('view_products'), asyncHandle
     paramIndex++;
   }
   
-  if (category_id) {
-    whereClause += ` AND p.category_id = $${paramIndex}`;
-    queryParams.push(parseInt(category_id));
-    paramIndex++;
+  if (category || category_id) {
+    const categoryValue = parseInt(category || category_id);
+    if (!isNaN(categoryValue)) {
+      whereClause += ` AND p.category_id = $${paramIndex}`;
+      queryParams.push(categoryValue);
+      paramIndex++;
+    }
   }
   
-  if (status !== undefined) {
-    whereClause += ` AND p.status = $${paramIndex}`;
-    queryParams.push(parseInt(status));
-    paramIndex++;
+  if (status !== undefined && status !== '') {
+    const statusValue = parseInt(status);
+    if (!isNaN(statusValue)) {
+      whereClause += ` AND p.status = $${paramIndex}`;
+      queryParams.push(statusValue);
+      paramIndex++;
+    }
   }
   
   // 查詢商品列表
@@ -91,10 +97,9 @@ router.get('/', authenticateToken, checkPermission('view_products'), asyncHandle
       p.created_at,
       p.updated_at,
       c.name as category_name,
-      pi.image_url as main_image
+      p.brand_id as brand
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.category_id
-    LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_main = true
     WHERE 1=1 ${whereClause}
     ORDER BY p.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -111,12 +116,12 @@ router.get('/', authenticateToken, checkPermission('view_products'), asyncHandle
   
   res.json({
     success: true,
-    data: result.rows,
-    pagination: {
+    data: {
+      items: result.rows,
+      total,
       page: parseInt(page),
       limit: parseInt(limit),
-      total,
-      pages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit)
     }
   });
 }));

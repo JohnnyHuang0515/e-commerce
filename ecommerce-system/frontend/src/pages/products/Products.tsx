@@ -13,6 +13,7 @@ import {
   Popconfirm, 
   message,
   Modal,
+  Tooltip,
   Form,
   InputNumber
 } from 'antd';
@@ -70,7 +71,17 @@ const Products: React.FC = () => {
   const updateProductMutation = useUpdateProduct();
   const deleteProductMutation = useDeleteProduct();
 
-  const products = productsData?.data?.items || [];
+  // 處理產品數據，映射字段名稱
+  const rawProducts = productsData?.data?.items || [];
+  const products = rawProducts.map((product: any) => ({
+    ...product,
+    stock: product.stock_quantity || product.stock || 0,
+    category: product.category_name || product.category || '未分類',
+    createdAt: product.created_at || product.createdAt,
+    images: product.images || [],
+    // 轉換狀態：1=active, 0=inactive
+    status: product.status === 1 ? 'active' : product.status === 0 ? 'inactive' : product.status
+  }));
   const total = productsData?.data?.total || 0;
   const categories = categoriesData?.data || [];
 
@@ -108,13 +119,14 @@ const Products: React.FC = () => {
             <div style={{ 
               width: 40, 
               height: 40, 
-              backgroundColor: '#f5f5f5', 
+              backgroundColor: 'rgba(45, 45, 45, 0.8)', 
               borderRadius: 4,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 12,
-              color: '#999'
+              color: '#999',
+              border: '1px solid #404040'
             }}>
               無圖
             </div>
@@ -128,7 +140,15 @@ const Products: React.FC = () => {
       key: 'category',
       width: 100,
       render: (category: string) => (
-        <Tag color="blue">{category}</Tag>
+        <Tag 
+          style={{ 
+            backgroundColor: 'rgba(24, 144, 255, 0.2)',
+            borderColor: '#1890ff',
+            color: '#1890ff'
+          }}
+        >
+          {category}
+        </Tag>
       ),
     },
     {
@@ -159,7 +179,20 @@ const Products: React.FC = () => {
       key: 'stock',
       width: 80,
       render: (stock: number) => (
-        <Tag color={stock > 10 ? 'green' : stock > 0 ? 'orange' : 'red'}>
+        <Tag 
+          color={stock > 10 ? 'green' : stock > 0 ? 'orange' : 'red'}
+          style={{ 
+            backgroundColor: stock > 10 ? 'rgba(82, 196, 26, 0.2)' : 
+                           stock > 0 ? 'rgba(250, 173, 20, 0.2)' : 
+                           'rgba(255, 77, 79, 0.2)',
+            borderColor: stock > 10 ? '#52c41a' : 
+                        stock > 0 ? '#faad14' : 
+                        '#ff4d4f',
+            color: stock > 10 ? '#52c41a' : 
+                   stock > 0 ? '#faad14' : 
+                   '#ff4d4f'
+          }}
+        >
           {stock}
         </Tag>
       ),
@@ -171,15 +204,33 @@ const Products: React.FC = () => {
       width: 100,
       render: (status: string) => {
         const statusConfig = {
-          active: { color: 'green', text: '上架' },
-          inactive: { color: 'red', text: '下架' },
-          draft: { color: 'orange', text: '草稿' },
+          active: { color: '#52c41a', bgColor: 'rgba(82, 196, 26, 0.2)', text: '上架' },
+          inactive: { color: '#ff4d4f', bgColor: 'rgba(255, 77, 79, 0.2)', text: '下架' },
+          draft: { color: '#faad14', bgColor: 'rgba(250, 173, 20, 0.2)', text: '草稿' },
         };
         const config = statusConfig[status as keyof typeof statusConfig];
         if (!config) {
-          return <Tag>{status || '未知狀態'}</Tag>;
+          return (
+            <Tag style={{ 
+              backgroundColor: 'rgba(45, 45, 45, 0.8)',
+              borderColor: '#404040',
+              color: '#fff'
+            }}>
+              {status || '未知狀態'}
+            </Tag>
+          );
         }
-        return <Tag color={config.color}>{config.text}</Tag>;
+        return (
+          <Tag 
+            style={{ 
+              backgroundColor: config.bgColor,
+              borderColor: config.color,
+              color: config.color
+            }}
+          >
+            {config.text}
+          </Tag>
+        );
       },
     },
     {
@@ -195,30 +246,39 @@ const Products: React.FC = () => {
       width: 150,
       render: (_: any, record: any) => (
         <Space size="small">
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            size="small"
-            onClick={() => handleView(record)}
-          />
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEdit(record)}
-          />
+          <Tooltip title="查看詳情">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              size="small"
+              onClick={() => handleView(record)}
+              style={{ color: '#fff' }}
+            />
+          </Tooltip>
+          <Tooltip title="編輯商品">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              size="small"
+              onClick={() => handleEdit(record)}
+              style={{ color: '#fff' }}
+            />
+          </Tooltip>
           <Popconfirm
             title="確定要刪除這個商品嗎？"
-            onConfirm={() => handleDelete(record._id || record.id)}
+            onConfirm={() => handleDelete(record.public_id)}
             okText="確定"
             cancelText="取消"
           >
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              size="small"
-              danger
-            />
+            <Tooltip title="刪除商品">
+              <Button
+                type="text"
+                icon={<DeleteOutlined />}
+                size="small"
+                danger
+                style={{ color: '#ff4d4f' }}
+              />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -270,18 +330,242 @@ const Products: React.FC = () => {
 
   const handleView = (product: any) => {
     Modal.info({
-      title: '商品詳情',
-      width: 600,
+      title: (
+        <div style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>
+          商品詳情
+        </div>
+      ),
+      width: 700,
+      className: 'dark-modal',
+      styles: {
+        body: {
+          backgroundColor: '#1f1f1f',
+          color: '#fff'
+        },
+        header: {
+          backgroundColor: '#2d2d2d',
+          borderBottom: '1px solid #404040',
+          color: '#fff'
+        },
+        mask: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)'
+        },
+        content: {
+          backgroundColor: '#1f1f1f',
+          border: '1px solid #404040',
+          borderRadius: '8px'
+        }
+      },
       content: (
-        <div>
-          <p><strong>商品名稱:</strong> {product.name}</p>
-          <p><strong>描述:</strong> {product.description}</p>
-          <p><strong>價格:</strong> {product.price}</p>
-          <p><strong>分類:</strong> {product.category}</p>
-          <p><strong>品牌:</strong> {product.brand}</p>
-          <p><strong>SKU:</strong> {product.sku}</p>
-          <p><strong>庫存:</strong> {product.stock}</p>
-          <p><strong>狀態:</strong> {product.status}</p>
+        <div style={{ color: '#fff' }}>
+          {/* 商品圖片區域 */}
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            {product.images && product.images.length > 0 ? (
+              <Image
+                src={product.images[0]}
+                alt="商品圖片"
+                width={200}
+                height={200}
+                style={{ 
+                  objectFit: 'cover', 
+                  borderRadius: 8,
+                  border: '2px solid #404040'
+                }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgeHANwDrkl1AuO+pmgAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAwqADAAQAAAABAAAAwwAAAAD9b/HnAAAHlklEQVR4Ae3dP3Ik1RnG4W+FgYxN"
+              />
+            ) : (
+              <div style={{ 
+                width: 200, 
+                height: 200, 
+                backgroundColor: 'rgba(45, 45, 45, 0.8)', 
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16,
+                color: '#999',
+                border: '2px solid #404040',
+                margin: '0 auto'
+              }}>
+                無商品圖片
+              </div>
+            )}
+          </div>
+
+          {/* 商品基本信息 */}
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ color: '#fff', marginBottom: 16, fontSize: '16px', fontWeight: 'bold' }}>
+              📋 商品信息
+            </h3>
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>商品名稱</div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.name}</div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>SKU</div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.sku}</div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>分類</div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.category}</div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>品牌</div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.brand || '未設定'}</div>
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* 價格和庫存信息 */}
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ color: '#fff', marginBottom: 16, fontSize: '16px', fontWeight: 'bold' }}>
+              💰 價格與庫存
+            </h3>
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(24, 144, 255, 0.1)',
+                  padding: 20,
+                  borderRadius: 8,
+                  border: '2px solid #1890ff',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#1890ff', fontSize: 12, marginBottom: 8 }}>💰 商品價格</div>
+                  <div style={{ color: '#1890ff', fontSize: 24, fontWeight: 'bold' }}>${product.price}</div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: product.stock > 10 ? 'rgba(82, 196, 26, 0.1)' : 
+                                 product.stock > 0 ? 'rgba(250, 173, 20, 0.1)' : 
+                                 'rgba(255, 77, 79, 0.1)',
+                  padding: 20,
+                  borderRadius: 8,
+                  border: `2px solid ${product.stock > 10 ? '#52c41a' : 
+                                          product.stock > 0 ? '#faad14' : 
+                                          '#ff4d4f'}`,
+                  textAlign: 'center'
+                }}>
+                  <div style={{ 
+                    color: product.stock > 10 ? '#52c41a' : 
+                           product.stock > 0 ? '#faad14' : 
+                           '#ff4d4f', 
+                    fontSize: 12, 
+                    marginBottom: 8 
+                  }}>
+                    📦 當前庫存
+                  </div>
+                  <div style={{ 
+                    color: product.stock > 10 ? '#52c41a' : 
+                           product.stock > 0 ? '#faad14' : 
+                           '#ff4d4f', 
+                    fontSize: 24, 
+                    fontWeight: 'bold' 
+                  }}>
+                    {product.stock}
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* 其他信息 */}
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 16, fontSize: '16px', fontWeight: 'bold' }}>
+              ℹ️ 其他信息
+            </h3>
+            <Row gutter={[16, 16]}>
+              <Col span={24}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>商品描述</div>
+                  <div style={{ color: '#fff', fontSize: 14, lineHeight: 1.5 }}>
+                    {product.description || '暫無描述'}
+                  </div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>商品狀態</div>
+                  <Tag 
+                    style={{ 
+                      backgroundColor: product.status === 'active' ? 'rgba(82, 196, 26, 0.2)' : 
+                                       product.status === 'inactive' ? 'rgba(255, 77, 79, 0.2)' : 
+                                       'rgba(250, 173, 20, 0.2)',
+                      borderColor: product.status === 'active' ? '#52c41a' : 
+                                  product.status === 'inactive' ? '#ff4d4f' : 
+                                  '#faad14',
+                      color: product.status === 'active' ? '#52c41a' : 
+                             product.status === 'inactive' ? '#ff4d4f' : 
+                             '#faad14'
+                    }}
+                  >
+                    {product.status === 'active' ? '上架' : 
+                     product.status === 'inactive' ? '下架' : 
+                     product.status === 'draft' ? '草稿' : product.status}
+                  </Tag>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ 
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  padding: 16,
+                  borderRadius: 8,
+                  border: '1px solid #404040',
+                  marginBottom: 12
+                }}>
+                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>創建時間</div>
+                  <div style={{ color: '#fff', fontSize: 14 }}>
+                    {product.createdAt ? new Date(product.createdAt).toLocaleString() : '未知'}
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
         </div>
       ),
     });
@@ -315,8 +599,8 @@ const Products: React.FC = () => {
       };
 
       if (editingProduct) {
-        // 使用 _id 或 id，確保有正確的 ID
-        const productId = editingProduct._id || editingProduct.id;
+        // 使用 public_id 作為商品 ID
+        const productId = editingProduct.public_id;
         if (!productId) {
           message.error('商品 ID 不存在');
           return;
@@ -338,57 +622,104 @@ const Products: React.FC = () => {
   };
 
   return (
-    <div className="products-page">
-      <PageHeader
-        title="商品管理"
-        subtitle="管理商品信息、庫存和狀態"
-        extra={
+    <div 
+      className="products-page"
+      style={{ 
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)',
+        padding: '24px'
+      }}
+    >
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>商品列表</h2>
+        <p style={{ margin: '8px 0 0 0', color: '#b0b0b0', fontSize: '14px' }}>
+          查看和管理商品信息、庫存和狀態
+        </p>
+        <div style={{ marginTop: 16 }}>
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={() => refetch()}
+              style={{ color: '#fff', borderColor: '#404040' }}
+            >
               刷新
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={handleAdd}
+              style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}
+            >
               新增商品
             </Button>
           </Space>
-        }
-      />
+        </div>
+      </div>
 
-      <Card className="products-content">
+      <Card 
+        className="products-content"
+        style={{ 
+          backgroundColor: 'rgba(45, 45, 45, 0.8)',
+          border: '1px solid #404040',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(10px)'
+        }}
+        bodyStyle={{ 
+          backgroundColor: 'transparent',
+          padding: '24px'
+        }}
+      >
         {/* 搜索和篩選 */}
-        <div className="products-filters">
+        <div className="products-filters" style={{ marginBottom: 24 }}>
           <Row gutter={[16, 16]} align="middle">
             <Col xs={24} sm={12} md={8}>
               <Search
                 placeholder="搜索商品名稱或SKU"
                 allowClear
                 onSearch={handleSearch}
-                style={{ width: '100%' }}
+                style={{ 
+                  width: '100%',
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  borderColor: '#404040'
+                }}
+                className="dark-search"
               />
             </Col>
             <Col xs={24} sm={6} md={4}>
               <Select
                 placeholder="選擇分類"
                 allowClear
-                style={{ width: '100%' }}
+                style={{ 
+                  width: '100%',
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  borderColor: '#404040'
+                }}
+                className="dark-select"
                 onChange={handleCategoryChange}
               >
-                <Option value="electronics">電子產品</Option>
-                <Option value="clothing">服裝</Option>
-                <Option value="books">圖書</Option>
-                <Option value="home">家居</Option>
+                {categories.map((category) => (
+                  <Option key={category._id || category.category_id} value={category._id || category.category_id}>
+                    {category.name}
+                  </Option>
+                ))}
               </Select>
             </Col>
             <Col xs={24} sm={6} md={4}>
               <Select
                 placeholder="選擇狀態"
                 allowClear
-                style={{ width: '100%' }}
+                style={{ 
+                  width: '100%',
+                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
+                  borderColor: '#404040'
+                }}
+                className="dark-select"
                 onChange={handleStatusChange}
               >
-                <Option value="active">上架</Option>
-                <Option value="inactive">下架</Option>
-                <Option value="draft">草稿</Option>
+                <Option key="active" value="active">上架</Option>
+                <Option key="inactive" value="inactive">下架</Option>
+                <Option key="draft" value="draft">草稿</Option>
               </Select>
             </Col>
           </Row>
@@ -399,7 +730,11 @@ const Products: React.FC = () => {
           columns={columns}
           dataSource={products}
           loading={isLoading}
-          rowKey="_id"
+          rowKey="public_id"
+          style={{
+            backgroundColor: 'transparent'
+          }}
+          className="dark-table"
           pagination={{
             current: searchParams.page,
             pageSize: searchParams.limit,
@@ -407,6 +742,15 @@ const Products: React.FC = () => {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
+            itemRender: (current, type, originalElement) => {
+              if (type === 'prev') {
+                return <Button style={{ color: '#fff', borderColor: '#404040' }}>上一頁</Button>;
+              }
+              if (type === 'next') {
+                return <Button style={{ color: '#fff', borderColor: '#404040' }}>下一頁</Button>;
+              }
+              return originalElement;
+            }
           }}
           onChange={handleTableChange}
           scroll={{ x: 1000 }}
@@ -420,11 +764,32 @@ const Products: React.FC = () => {
         onCancel={() => setModalVisible(false)}
         footer={null}
         width={600}
+        className="dark-modal"
+        styles={{
+          body: {
+            backgroundColor: '#1f1f1f',
+            color: '#fff'
+          },
+          header: {
+            backgroundColor: '#2d2d2d',
+            borderBottom: '1px solid #404040',
+            color: '#fff'
+          },
+          mask: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)'
+          },
+          content: {
+            backgroundColor: '#1f1f1f',
+            border: '1px solid #404040',
+            borderRadius: '8px'
+          }
+        }}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          className="dark-form"
         >
           <Row gutter={16}>
             <Col span={12}>
@@ -500,7 +865,7 @@ const Products: React.FC = () => {
               >
                 <Select placeholder="請選擇分類">
                   {categories.map((category) => (
-                    <Option key={category._id} value={category._id}>
+                    <Option key={category._id || category.category_id} value={category._id || category.category_id}>
                       {category.name}
                     </Option>
                   ))}
@@ -515,15 +880,15 @@ const Products: React.FC = () => {
             rules={[{ required: true, message: '請選擇狀態' }]}
           >
             <Select placeholder="請選擇狀態">
-              <Option value="active">上架</Option>
-              <Option value="inactive">下架</Option>
+              <Option key="active" value="active">上架</Option>
+              <Option key="inactive" value="inactive">下架</Option>
             </Select>
           </Form.Item>
 
           <Form.Item label="商品圖片">
             <ImageUpload
               entityType="product"
-              entityId={editingProduct?._id || editingProduct?.id || 'new'}
+              entityId={editingProduct?.public_id || 'new'}
               images={productImages}
               maxCount={5}
               onChange={setProductImages}
