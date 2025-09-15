@@ -37,6 +37,9 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
       const token = localStorage.getItem('auth_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log(`🔑 使用令牌: ${token.substring(0, 20)}...`);
+      } else {
+        console.log('⚠️ 沒有找到認證令牌');
       }
       config.headers['X-Request-ID'] = Date.now().toString();
       console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
@@ -56,11 +59,37 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
     },
     (error) => {
       console.error('❌ Response Error:', error.response?.status, error.response?.data);
+      
+      // 只有在明確的認證失敗時才清除認證信息
       if (error.response?.status === 401) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_info');
-        window.location.href = '/login';
+        const errorMessage = error.response?.data?.message || '';
+        const errorData = error.response?.data?.error || '';
+        
+        console.log('401 錯誤詳情:', {
+          message: errorMessage,
+          error: errorData,
+          fullResponse: error.response?.data
+        });
+        
+        // 檢查是否是明確的認證失敗（如 token 過期、無效等）
+        if (errorMessage.includes('認證失敗') || 
+            errorMessage.includes('認證令牌無效') ||
+            errorMessage.includes('token') || 
+            errorMessage.includes('unauthorized') ||
+            errorMessage.includes('authentication') ||
+            errorData === '認證令牌無效') {
+          console.log('收到明確的認證失敗，清除認證信息');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_info');
+          // 延遲重定向，避免與 React Router 衝突
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        } else {
+          console.log('收到 401 錯誤，但可能是權限問題，不清除認證信息');
+        }
       }
+      
       return Promise.reject(error);
     }
   );

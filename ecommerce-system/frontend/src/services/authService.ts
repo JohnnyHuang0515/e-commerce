@@ -48,13 +48,6 @@ export class AuthService {
   static async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     try {
       const response = await authApi.post('/v1/auth/login', credentials);
-      
-      // 保存 token 到 localStorage
-      if (response.data.success && response.data.data.token) {
-        localStorage.setItem('auth_token', response.data.data.token);
-        localStorage.setItem('user_info', JSON.stringify(response.data.data.user));
-      }
-      
       return response.data;
     } catch (error) {
       console.error('登入失敗:', error);
@@ -66,13 +59,6 @@ export class AuthService {
   static async register(userData: RegisterRequest): Promise<ApiResponse<LoginResponse>> {
     try {
       const response = await authApi.post('/v1/auth/register', userData);
-      
-      // 保存 token 到 localStorage
-      if (response.data.success && response.data.data.token) {
-        localStorage.setItem('auth_token', response.data.data.token);
-        localStorage.setItem('user_info', JSON.stringify(response.data.data.user));
-      }
-      
       return response.data;
     } catch (error) {
       console.error('註冊失敗:', error);

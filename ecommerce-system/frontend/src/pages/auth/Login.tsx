@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Form,
@@ -31,46 +31,38 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
 
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // 監聽認證狀態變化，自動跳轉
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('檢測到用戶已認證，自動跳轉到:', from);
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleLogin = async (values: { username: string; password: string }) => {
     setLoading(true);
     try {
-      // 暫時使用演示登入，直到後端數據庫初始化完成
-      if (values.username === 'admin@ecommerce.com' && values.password === 'password123') {
-        const userData = {
-          _id: 'demo-admin-001',
-          username: '管理員',
-          email: 'admin@ecommerce.com',
-          role: 'admin',
-          permissions: ['read', 'write', 'delete', 'admin']
-        };
-        
-        const demoToken = 'demo-jwt-token-' + Date.now();
-        login(demoToken, userData);
-        navigate(from, { replace: true });
-        return;
-      }
-      
-      // 嘗試使用真實的 API 登入
-      const response = await AuthService.login({ 
-        email: values.username, 
-        password: values.password 
+      // 使用真實的 API 登入
+      const response = await AuthService.login({
+        email: values.username,
+        password: values.password
       });
-      
+
       if (response.success && response.data) {
         const userData = {
-          _id: response.data.user.id,
-          username: response.data.user.name,
+          _id: response.data.user.public_id, // Mapped public_id to _id
+          username: response.data.user.name, // Mapped name to username
           email: response.data.user.email,
-          role: response.data.user.role,
+          role: 'admin', // 從權限推斷角色
           permissions: response.data.user.permissions || []
         };
-        
+
         login(response.data.token, userData);
-        navigate(from, { replace: true });
+        console.log('登入成功，AuthContext 狀態將更新');
       } else {
         message.error('登入失敗，請檢查用戶名和密碼');
       }

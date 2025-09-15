@@ -14,6 +14,7 @@ const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
 const cartRoutes = require('./routes/cart');
 const recommendationRoutes = require('./routes/recommendations');
+const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 
@@ -184,6 +185,7 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/recommendations', recommendationRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 
 // API 版本信息
 app.get('/api/v1', (req, res) => {
@@ -200,6 +202,7 @@ app.get('/api/v1', (req, res) => {
         orders: '/api/v1/orders',
         cart: '/api/v1/cart',
         recommendations: '/api/v1/recommendations',
+        dashboard: '/api/v1/dashboard',
         docs: '/api-docs',
         health: '/health'
       },

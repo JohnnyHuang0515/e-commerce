@@ -14,6 +14,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
+  
+  console.log('ProtectedRoute 檢查:', { isAuthenticated, isLoading, user: user?.username, location: location.pathname });
 
   // 顯示載入中
   if (isLoading) {

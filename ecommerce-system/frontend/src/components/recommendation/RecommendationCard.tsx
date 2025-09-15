@@ -4,10 +4,19 @@ import {
   ShoppingCartOutlined, 
   HeartOutlined, 
   EyeOutlined,
-  StarOutlined,
   InfoCircleOutlined 
 } from '@ant-design/icons';
-import { RecommendationItem } from '../../services/recommendationService';
+// import { RecommendationItem } from '../../services/recommendationService';
+
+// 臨時定義 RecommendationItem 類型
+interface RecommendationItem {
+  id: string;
+  name: string;
+  price: number;
+  image?: string;
+  category?: string;
+  score?: number;
+}
 
 const { Text, Title } = Typography;
 

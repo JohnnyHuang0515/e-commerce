@@ -36,7 +36,7 @@ import './styles/global.less';
 const queryClient = new QueryClient();
 
 const AppContent: React.FC = () => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <ConfigProvider
