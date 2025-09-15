@@ -1,0 +1,243 @@
+version: "3.9"
+
+services:
+  # 統一 Node.js API 服務
+  api-node:
+    build: 
+      context: ./backend-node
+      dockerfile: Dockerfile
+    container_name: ecommerce-api-node
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=ecommerce_new
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password123
+      - MONGODB_URI=mongodb://mongo:27017/ecommerce
+      - REDIS_URL=redis://redis:6379
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRES_IN=24h
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+    volumes:
+      - ./backend-node:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - clickhouse
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL 資料庫
+  postgres:
+    image: postgres:15-alpine
+    container_name: ecommerce-postgres
+    environment:
+      - POSTGRES_DB=ecommerce_new
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-initdb.d
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d ecommerce_new"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB 資料庫
+  mongo:
+    image: mongo:6.0
+    container_name: ecommerce-mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=ecommerce
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./scripts:/docker-entrypoint-initdb.d
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 快取
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse 分析資料庫
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: ecommerce-clickhouse
+    environment:
+      - CLICKHOUSE_DB=ecommerce_analytics
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./scripts/clickhouse:/docker-entrypoint-initdb.d
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Milvus 向量資料庫
+  milvus:
+    image: milvusdb/milvus:v2.3.0
+    container_name: ecommerce-milvus
+    command: ["milvus", "run", "standalone"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # etcd (Milvus 依賴)
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: ecommerce-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd_data:/etcd
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # MinIO 物件存儲
+  minio:
+    image: minio/minio:RELEASE.2023-09-04T19-57-37Z
+    container_name: ecommerce-minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    ports:
+      - "9001:9000"
+      - "9002:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: ecommerce-nginx
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - api-node
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # FastAPI 微服務 (暫時註解掉，等待後續實現)
+  # fastapi-analytics:
+  #   build:
+  #     context: ./backend-fastapi
+  #     dockerfile: Dockerfile
+  #   container_name: ecommerce-fastapi-analytics
+  #   ports:
+  #     - "8001:8001"
+  #   environment:
+  #     - MONGODB_URI=mongodb://admin:password123@mongo:27017/ecommerce?authSource=admin
+  #     - CLICKHOUSE_URL=http://clickhouse:8123
+  #     - REDIS_URL=redis://redis:6379
+  #   depends_on:
+  #     - mongo
+  #     - clickhouse
+  #     - redis
+  #   networks:
+  #     - ecommerce-network
+  #   restart: unless-stopped
+  #   profiles:
+  #     - analytics
+
+volumes:
+  postgres_data:
+    driver: local
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
+  clickhouse_data:
+    driver: local
+  milvus_data:
+    driver: local
+  etcd_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  ecommerce-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

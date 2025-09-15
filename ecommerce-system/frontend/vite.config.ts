@@ -12,12 +12,17 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    host: true, // 允許外部訪問
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
     },
+  },
+  // 暫時跳過 TypeScript 檢查
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' }
   },
 });

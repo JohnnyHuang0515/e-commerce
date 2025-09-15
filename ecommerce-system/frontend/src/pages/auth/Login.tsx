@@ -33,12 +33,28 @@ const Login: React.FC = () => {
   const location = useLocation();
   const { login } = useAuth();
 
-  const from = location.state?.from?.pathname || '/admin';
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleLogin = async (values: { username: string; password: string }) => {
     setLoading(true);
     try {
-      // 使用真實的 API 登入
+      // 暫時使用演示登入，直到後端數據庫初始化完成
+      if (values.username === 'admin@ecommerce.com' && values.password === 'password123') {
+        const userData = {
+          _id: 'demo-admin-001',
+          username: '管理員',
+          email: 'admin@ecommerce.com',
+          role: 'admin',
+          permissions: ['read', 'write', 'delete', 'admin']
+        };
+        
+        const demoToken = 'demo-jwt-token-' + Date.now();
+        login(demoToken, userData);
+        navigate(from, { replace: true });
+        return;
+      }
+      
+      // 嘗試使用真實的 API 登入
       const response = await AuthService.login({ 
         email: values.username, 
         password: values.password 

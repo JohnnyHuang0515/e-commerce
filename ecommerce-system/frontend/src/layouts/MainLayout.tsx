@@ -36,7 +36,7 @@ const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  // 選單項目
+  // 選單項目 - 按照前端架構規劃重新組織
   const menuItems = [
     {
       key: '/dashboard',
@@ -44,74 +44,102 @@ const MainLayout: React.FC = () => {
       label: '儀表板',
     },
     {
-      key: '/products',
+      key: 'product-management',
       icon: <ShoppingOutlined />,
       label: '商品管理',
+      children: [
+        {
+          key: '/products',
+          label: '商品列表',
+        },
+        {
+          key: '/inventory',
+          label: '庫存管理',
+        },
+      ],
     },
     {
-      key: '/orders',
+      key: 'order-management',
       icon: <FileTextOutlined />,
       label: '訂單管理',
+      children: [
+        {
+          key: '/orders',
+          label: '訂單清單',
+        },
+        {
+          key: '/logistics',
+          label: '物流管理',
+        },
+        {
+          key: '/payments',
+          label: '支付管理',
+        },
+      ],
     },
     {
-      key: '/users',
+      key: 'user-management',
       icon: <UserOutlined />,
       label: '用戶管理',
+      children: [
+        {
+          key: '/users',
+          label: '使用者列表',
+        },
+        {
+          key: '/permissions',
+          label: '權限設定',
+        },
+      ],
     },
     {
-      key: '/analytics',
-      icon: <BarChartOutlined />,
-      label: '數據分析',
-    },
-    {
-      key: '/payments',
-      icon: <DollarOutlined />,
-      label: '支付管理',
-    },
-    {
-      key: '/logistics',
-      icon: <TruckOutlined />,
-      label: '物流管理',
-    },
-    {
-      key: '/inventory',
-      icon: <InboxOutlined />,
-      label: '庫存管理',
-    },
-    {
-      key: '/permissions',
-      icon: <SafetyOutlined />,
-      label: '權限管理',
-    },
-    {
-      key: '/ai-search',
-      icon: <ThunderboltOutlined />,
-      label: 'AI智能搜尋',
-    },
-    {
-      key: '/recommendations',
+      key: 'marketing-management',
       icon: <HeartOutlined />,
-      label: 'AI智能推薦',
+      label: '行銷管理',
+      children: [
+        {
+          key: '/recommendations',
+          label: '推薦商品配置',
+        },
+      ],
     },
     {
-      key: '/logs',
-      icon: <BugOutlined />,
-      label: '日誌管理',
+      key: 'ai-system',
+      icon: <ThunderboltOutlined />,
+      label: 'AI 系統',
+      children: [
+        {
+          key: '/ai-search',
+          label: 'AI 智能搜尋',
+        },
+        {
+          key: '/analytics',
+          label: 'AI 分析報告',
+        },
+      ],
     },
     {
-      key: '/notifications',
-      icon: <BellOutlined />,
-      label: '通知管理',
-    },
-    {
-      key: '/utility',
-      icon: <ToolOutlined />,
-      label: '工具管理',
-    },
-    {
-      key: '/settings',
+      key: 'system-management',
       icon: <SettingOutlined />,
-      label: '系統設定',
+      label: '系統管理',
+      children: [
+        {
+          key: '/logs',
+          label: '日誌管理',
+        },
+        {
+          key: '/notifications',
+          label: '通知管理',
+        },
+        {
+          key: '/utility',
+          label: '工具管理',
+        },
+        {
+          key: '/settings',
+          label: '系統設定',
+        },
+      ],
     },
   ];
 
@@ -173,6 +201,7 @@ const MainLayout: React.FC = () => {
           items={menuItems}
           onClick={handleMenuClick}
           className="main-menu"
+          defaultOpenKeys={['product-management', 'order-management', 'user-management']}
         />
       </Sider>
       

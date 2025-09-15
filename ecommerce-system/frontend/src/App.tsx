@@ -14,7 +14,7 @@ import Login from './pages/auth/Login';
 import Dashboard from './pages/dashboard/Dashboard';
 import AdminPage from './pages/admin';
 
-// 導入頁面組件
+// 導入頁面組件 - 對應新的管理員端架構
 import Products from './pages/products/Products';
 import Orders from './pages/orders/Orders';
 import Users from './pages/users/Users';
@@ -58,14 +58,15 @@ const AppContent: React.FC = () => {
                 <MainLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Navigate to="/admin" replace />} />
-              <Route path="admin" element={<AdminPage />} />
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              {/* 管理員端核心功能模組 */}
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="products" element={<Products />} />
               <Route path="orders" element={<Orders />} />
               <Route path="users" element={<Users />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
+              {/* 擴展功能模組 */}
               <Route path="payments" element={<Payments />} />
               <Route path="logistics" element={<Logistics />} />
               <Route path="inventory" element={<Inventory />} />
@@ -75,6 +76,8 @@ const AppContent: React.FC = () => {
               <Route path="logs" element={<LogManagement />} />
               <Route path="utility" element={<UtilityManagement />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              {/* 向後兼容路由 */}
+              <Route path="admin" element={<AdminPage />} />
             </Route>
           </Routes>
         </Router>

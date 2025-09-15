@@ -36,12 +36,28 @@ pkill -f "node.*frontend" 2>/dev/null || true
 
 echo "🔧 清理端口占用..."
 # 清理可能占用的端口
-PORTS=(3000 3001 3002 3003 3004 3005 3006 3007 3008 3009 8080 8081 9011)
+PORTS=(3000 3001 3002 3003 3004 3005 3006 3007 3008 3009 8080 8081 9011 5432 27017 6379 9000)
 for port in "${PORTS[@]}"; do
+    echo "   清理端口 $port..."
     PID=$(lsof -ti:$port 2>/dev/null)
     if [ ! -z "$PID" ]; then
         echo "   終止進程 $PID (端口 $port)"
         kill -9 $PID 2>/dev/null || true
+    fi
+    
+    # 特別處理 PostgreSQL 端口
+    if [ "$port" = "5432" ]; then
+        echo "   特別清理 PostgreSQL 端口 5432..."
+        # 強制終止所有 postgres 相關進程
+        pkill -f postgres 2>/dev/null || true
+        # 使用 netstat 查找並終止
+        NETSTAT_PID=$(netstat -tlnp | grep :5432 | awk '{print $7}' | cut -d'/' -f1 | head -1)
+        if [ ! -z "$NETSTAT_PID" ] && [ "$NETSTAT_PID" != "-" ]; then
+            echo "   終止 PostgreSQL 進程 $NETSTAT_PID"
+            kill -9 $NETSTAT_PID 2>/dev/null || true
+        fi
+        echo "   等待端口釋放..."
+        sleep 2
     fi
 done
 

@@ -1,0 +1,38 @@
+# 使用官方 Node.js 18 Alpine 映像
+FROM node:18-alpine
+
+# 設定工作目錄
+WORKDIR /app
+
+# 安裝系統依賴
+RUN apk add --no-cache \
+    curl \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# 複製 package.json 和 package-lock.json
+COPY package*.json ./
+
+# 安裝 Node.js 依賴
+RUN npm ci --only=production && npm cache clean --force
+
+# 複製應用程式代碼
+COPY . .
+
+# 創建非 root 用戶
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 設定權限
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# 暴露端口
+EXPOSE 8000
+
+# 健康檢查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# 啟動應用程式
+CMD ["node", "app.js"]
