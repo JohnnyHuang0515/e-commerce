@@ -1118,3 +1118,388 @@ async function checkProductConsistency() {
 - **Redis**：命中率 < 90%、記憶體使用 > 90%
 - **Milvus**：搜尋延遲 > 100ms、GPU 使用 > 95%
 - **ClickHouse**：查詢失敗率 > 5%、磁碟使用 > 80%
+
+---
+
+## 12. RBAC 權限管理系統設計
+
+### 12.1 電商 RBAC 架構概述
+
+電商系統的權限管理需要支援多種角色和複雜的業務場景，包括：
+- **顧客**：瀏覽商品、下單、退貨
+- **賣家**：商品管理、訂單處理
+- **物流**：配送狀態更新
+- **管理員**：用戶管理、退款處理、角色分配
+- **分析人員**：報表查詢、數據分析
+
+### 12.2 PostgreSQL RBAC 表設計
+
+#### 12.2.1 Roles（角色表）
+```sql
+CREATE TABLE roles (
+    role_id BIGSERIAL PRIMARY KEY,
+    role_name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 電商角色範例
+INSERT INTO roles (role_name, description) VALUES
+('admin', '系統管理員'),
+('seller', '賣家'),
+('customer', '顧客'),
+('logistics', '物流人員'),
+('analyst', '分析人員');
+```
+
+#### 12.2.2 Permissions（權限表）
+```sql
+CREATE TABLE permissions (
+    permission_id BIGSERIAL PRIMARY KEY,
+    permission_name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    resource_type VARCHAR(50), -- 資源類型：product, order, user, report
+    action_type VARCHAR(50),    -- 操作類型：create, read, update, delete
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 電商權限範例
+INSERT INTO permissions (permission_name, description, resource_type, action_type) VALUES
+-- 商品相關權限
+('create_product', '建立商品', 'product', 'create'),
+('read_product', '查看商品', 'product', 'read'),
+('update_product', '更新商品', 'product', 'update'),
+('delete_product', '刪除商品', 'product', 'delete'),
+
+-- 訂單相關權限
+('create_order', '建立訂單', 'order', 'create'),
+('read_order', '查看訂單', 'order', 'read'),
+('update_order', '更新訂單', 'order', 'update'),
+('update_order_status', '更新訂單狀態', 'order', 'update'),
+('delete_order', '刪除訂單', 'order', 'delete'),
+
+-- 用戶相關權限
+('manage_users', '管理用戶', 'user', 'manage'),
+('assign_roles', '分配角色', 'user', 'assign'),
+
+-- 退貨相關權限
+('request_return', '申請退貨', 'return', 'create'),
+('process_return', '處理退貨', 'return', 'update'),
+('refund_orders', '退款處理', 'refund', 'process'),
+
+-- 報表相關權限
+('view_reports', '查看報表', 'report', 'read'),
+('query_clickhouse', '查詢分析數據', 'analytics', 'read');
+```
+
+#### 12.2.3 Role_Permissions（角色權限關聯表）
+```sql
+CREATE TABLE role_permissions (
+    role_permission_id BIGSERIAL PRIMARY KEY,
+    role_id BIGINT NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+    permission_id BIGINT NOT NULL REFERENCES permissions(permission_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(role_id, permission_id)
+);
+
+-- 角色權限分配
+-- 顧客權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'customer' 
+AND p.permission_name IN ('read_product', 'create_order', 'request_return');
+
+-- 賣家權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'seller' 
+AND p.permission_name IN ('create_product', 'update_product', 'read_order', 'update_order');
+
+-- 物流權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'logistics' 
+AND p.permission_name IN ('read_order', 'update_order_status');
+
+-- 管理員權限（所有權限）
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'admin';
+
+-- 分析人員權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'analyst' 
+AND p.permission_name IN ('view_reports', 'query_clickhouse');
+```
+
+#### 12.2.4 User_Roles（用戶角色關聯表）
+```sql
+CREATE TABLE user_roles (
+    user_role_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    role_id BIGINT NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT TRUE,
+    assigned_by BIGINT REFERENCES users(user_id), -- 分配者
+    assigned_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP, -- 角色過期時間（可選）
+    UNIQUE(user_id, role_id)
+);
+
+-- 建立索引
+CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX idx_user_roles_active ON user_roles(user_id, is_active);
+```
+
+### 12.3 RBAC 電商案例實作
+
+#### 12.3.1 角色權限對應表
+
+| 角色 | 權限 | 說明 |
+|------|------|------|
+| **顧客 (Customer)** | | |
+| | `read_product` | 瀏覽商品 |
+| | `create_order` | 下單購買 |
+| | `request_return` | 申請退貨 |
+| **賣家 (Seller)** | | |
+| | `create_product` | 建立商品 |
+| | `update_product` | 更新商品 |
+| | `read_order` | 查看訂單 |
+| | `update_order` | 處理訂單 |
+| **物流 (Logistics)** | | |
+| | `read_order` | 查看訂單 |
+| | `update_order_status` | 更新配送狀態 |
+| **管理員 (Admin)** | | |
+| | `manage_users` | 管理用戶 |
+| | `refund_orders` | 退款處理 |
+| | `assign_roles` | 分配角色 |
+| | `*` | 所有權限 |
+| **分析人員 (Analyst)** | | |
+| | `view_reports` | 查看報表 |
+| | `query_clickhouse` | 查詢分析數據 |
+
+#### 12.3.2 權限檢查函數
+
+```sql
+-- 檢查用戶是否有特定權限
+CREATE OR REPLACE FUNCTION check_user_permission(
+    p_user_id BIGINT,
+    p_permission_name VARCHAR(100)
+) RETURNS BOOLEAN AS $$
+DECLARE
+    has_permission BOOLEAN := FALSE;
+BEGIN
+    SELECT EXISTS(
+        SELECT 1
+        FROM users u
+        JOIN user_roles ur ON u.user_id = ur.user_id
+        JOIN roles r ON ur.role_id = r.role_id
+        JOIN role_permissions rp ON r.role_id = rp.role_id
+        JOIN permissions p ON rp.permission_id = p.permission_id
+        WHERE u.user_id = p_user_id
+        AND ur.is_active = TRUE
+        AND p.permission_name = p_permission_name
+    ) INTO has_permission;
+    
+    RETURN has_permission;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 獲取用戶所有權限
+CREATE OR REPLACE FUNCTION get_user_permissions(p_user_id BIGINT)
+RETURNS TABLE(permission_name VARCHAR(100), description TEXT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT p.permission_name, p.description
+    FROM users u
+    JOIN user_roles ur ON u.user_id = ur.user_id
+    JOIN roles r ON ur.role_id = r.role_id
+    JOIN role_permissions rp ON r.role_id = rp.role_id
+    JOIN permissions p ON rp.permission_id = p.permission_id
+    WHERE u.user_id = p_user_id
+    AND ur.is_active = TRUE
+    ORDER BY p.permission_name;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 12.4 權限管理最佳實踐
+
+#### 12.4.1 最小權限原則
+- 用戶只獲得完成工作所需的最小權限
+- 定期審查和撤銷不必要的權限
+- 使用角色過期機制
+
+#### 12.4.2 權限繼承
+```sql
+-- 支援角色繼承（可選）
+CREATE TABLE role_hierarchy (
+    parent_role_id BIGINT REFERENCES roles(role_id),
+    child_role_id BIGINT REFERENCES roles(role_id),
+    PRIMARY KEY (parent_role_id, child_role_id)
+);
+
+-- 範例：管理員角色包含賣家角色
+INSERT INTO role_hierarchy VALUES (
+    (SELECT role_id FROM roles WHERE role_name = 'admin'),
+    (SELECT role_id FROM roles WHERE role_name = 'seller')
+);
+```
+
+#### 12.4.3 動態權限
+```sql
+-- 支援條件式權限（基於業務規則）
+CREATE TABLE conditional_permissions (
+    permission_id BIGINT REFERENCES permissions(permission_id),
+    condition_type VARCHAR(50), -- 'time_based', 'location_based', 'amount_based'
+    condition_value TEXT,        -- JSON 格式的條件
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 範例：賣家只能在營業時間內更新商品
+INSERT INTO conditional_permissions VALUES (
+    (SELECT permission_id FROM permissions WHERE permission_name = 'update_product'),
+    'time_based',
+    '{"start_time": "09:00", "end_time": "18:00", "timezone": "Asia/Taipei"}'
+);
+```
+
+### 12.5 權限審計與監控
+
+#### 12.5.1 權限變更日誌
+```sql
+CREATE TABLE permission_audit_log (
+    audit_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id),
+    action VARCHAR(50), -- 'grant', 'revoke', 'modify'
+    role_id BIGINT REFERENCES roles(role_id),
+    permission_id BIGINT REFERENCES permissions(permission_id),
+    performed_by BIGINT REFERENCES users(user_id),
+    performed_at TIMESTAMP DEFAULT NOW(),
+    ip_address INET,
+    user_agent TEXT
+);
+
+-- 建立觸發器記錄權限變更
+CREATE OR REPLACE FUNCTION log_permission_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO permission_audit_log (user_id, action, role_id, performed_by)
+        VALUES (NEW.user_id, 'grant', NEW.role_id, NEW.assigned_by);
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO permission_audit_log (user_id, action, role_id, performed_by)
+        VALUES (OLD.user_id, 'revoke', OLD.role_id, OLD.assigned_by);
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_roles_audit_trigger
+    AFTER INSERT OR DELETE ON user_roles
+    FOR EACH ROW EXECUTE FUNCTION log_permission_changes();
+```
+
+#### 12.5.2 權限使用統計
+```sql
+-- 權限使用統計視圖
+CREATE VIEW permission_usage_stats AS
+SELECT 
+    p.permission_name,
+    COUNT(DISTINCT ur.user_id) as active_users,
+    COUNT(DISTINCT r.role_name) as roles_with_permission,
+    p.description
+FROM permissions p
+LEFT JOIN role_permissions rp ON p.permission_id = rp.permission_id
+LEFT JOIN roles r ON rp.role_id = r.role_id
+LEFT JOIN user_roles ur ON r.role_id = ur.role_id AND ur.is_active = TRUE
+GROUP BY p.permission_id, p.permission_name, p.description
+ORDER BY active_users DESC;
+```
+
+### 12.6 效能優化
+
+#### 12.6.1 權限快取策略
+```sql
+-- 建立權限快取表（定期更新）
+CREATE TABLE user_permission_cache (
+    user_id BIGINT PRIMARY KEY REFERENCES users(user_id),
+    permissions JSONB, -- 快取的權限列表
+    cached_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '1 hour'
+);
+
+-- 更新權限快取的函數
+CREATE OR REPLACE FUNCTION refresh_permission_cache(p_user_id BIGINT)
+RETURNS VOID AS $$
+DECLARE
+    user_permissions JSONB;
+BEGIN
+    SELECT jsonb_agg(p.permission_name)
+    INTO user_permissions
+    FROM get_user_permissions(p_user_id) p;
+    
+    INSERT INTO user_permission_cache (user_id, permissions)
+    VALUES (p_user_id, user_permissions)
+    ON CONFLICT (user_id) 
+    DO UPDATE SET 
+        permissions = EXCLUDED.permissions,
+        cached_at = NOW(),
+        expires_at = NOW() + INTERVAL '1 hour';
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### 12.6.2 查詢優化
+```sql
+-- 為權限查詢建立複合索引
+CREATE INDEX idx_user_roles_permission_lookup 
+ON user_roles(user_id, role_id, is_active);
+
+CREATE INDEX idx_role_permissions_lookup 
+ON role_permissions(role_id, permission_id);
+
+-- 權限查詢優化視圖
+CREATE VIEW user_permissions_view AS
+SELECT 
+    u.user_id,
+    u.email,
+    jsonb_agg(DISTINCT p.permission_name) as permissions,
+    jsonb_agg(DISTINCT r.role_name) as roles
+FROM users u
+JOIN user_roles ur ON u.user_id = ur.user_id AND ur.is_active = TRUE
+JOIN roles r ON ur.role_id = r.role_id
+JOIN role_permissions rp ON r.role_id = rp.role_id
+JOIN permissions p ON rp.permission_id = p.permission_id
+GROUP BY u.user_id, u.email;
+```
+
+### 12.7 安全考量
+
+#### 12.7.1 權限提升防護
+- 實施雙重認證進行敏感操作
+- 記錄所有權限變更操作
+- 定期審計權限分配
+
+#### 12.7.2 會話管理
+```sql
+-- 會話權限表
+CREATE TABLE user_sessions (
+    session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id BIGINT REFERENCES users(user_id),
+    permissions JSONB, -- 會話快取的權限
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '24 hours',
+    ip_address INET,
+    user_agent TEXT
+);
+```
+
+這個 RBAC 設計提供了完整的電商權限管理解決方案，支援多角色、細粒度權限控制、審計追蹤和效能優化。

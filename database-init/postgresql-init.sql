@@ -16,6 +16,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 -- Users 表
 CREATE TABLE Users (
     user_id BIGSERIAL PRIMARY KEY,
+    public_id UUID DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -407,17 +408,152 @@ INSERT INTO Products (name, price, stock_quantity, status, category_id) VALUES
 ('Nike Air Max', 120.00, 200, 'active', 9),
 ('Adidas T-Shirt', 29.99, 150, 'active', 10);
 
--- 插入測試用戶
+-- ==============================================
+-- RBAC 權限管理系統
+-- ==============================================
+
+-- 權限表
+CREATE TABLE IF NOT EXISTS permissions (
+    permission_id BIGSERIAL PRIMARY KEY,
+    permission_name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    resource_type VARCHAR(50), -- 資源類型：product, order, user, report
+    action_type VARCHAR(50),    -- 操作類型：create, read, update, delete
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 角色表
+CREATE TABLE IF NOT EXISTS roles (
+    role_id BIGSERIAL PRIMARY KEY,
+    role_name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 用戶角色關聯表
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_role_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    role_id BIGINT NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, role_id)
+);
+
+-- 角色權限關聯表
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_permission_id BIGSERIAL PRIMARY KEY,
+    role_id BIGINT NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+    permission_id BIGINT NOT NULL REFERENCES permissions(permission_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(role_id, permission_id)
+);
+
+-- RBAC 索引
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions(role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_permission_id ON role_permissions(permission_id);
+
+-- 插入電商權限
+INSERT INTO permissions (permission_name, description, resource_type, action_type) VALUES
+-- 商品相關權限
+('create_product', '建立商品', 'product', 'create'),
+('read_product', '查看商品', 'product', 'read'),
+('update_product', '更新商品', 'product', 'update'),
+('delete_product', '刪除商品', 'product', 'delete'),
+
+-- 訂單相關權限
+('create_order', '建立訂單', 'order', 'create'),
+('read_order', '查看訂單', 'order', 'read'),
+('update_order', '更新訂單', 'order', 'update'),
+('update_order_status', '更新訂單狀態', 'order', 'update'),
+('delete_order', '刪除訂單', 'order', 'delete'),
+
+-- 用戶相關權限
+('manage_users', '管理用戶', 'user', 'manage'),
+('assign_roles', '分配角色', 'user', 'assign'),
+
+-- 退貨相關權限
+('request_return', '申請退貨', 'return', 'create'),
+('process_return', '處理退貨', 'return', 'update'),
+('refund_orders', '退款處理', 'refund', 'process'),
+
+-- 報表相關權限
+('view_reports', '查看報表', 'report', 'read'),
+('query_clickhouse', '查詢分析數據', 'analytics', 'read')
+ON CONFLICT (permission_name) DO NOTHING;
+
+-- 插入電商角色
+INSERT INTO roles (role_name, description) VALUES
+('admin', '系統管理員'),
+('seller', '賣家'),
+('customer', '顧客'),
+('logistics', '物流人員'),
+('analyst', '分析人員')
+ON CONFLICT (role_name) DO NOTHING;
+
+-- 角色權限分配
+-- 顧客權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'customer' 
+AND p.permission_name IN ('read_product', 'create_order', 'request_return')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 賣家權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'seller' 
+AND p.permission_name IN ('create_product', 'update_product', 'read_order', 'update_order')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 物流權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'logistics' 
+AND p.permission_name IN ('read_order', 'update_order_status')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 管理員權限（所有權限）
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'admin'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 分析人員權限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r, permissions p
+WHERE r.role_name = 'analyst' 
+AND p.permission_name IN ('view_reports', 'query_clickhouse')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- ==============================================
+-- 種子資料
+-- ==============================================
+
+-- 插入測試用戶（使用正確的 bcrypt hash）
 INSERT INTO Users (name, email, password_hash, phone, status) VALUES 
-('張三', 'zhang.san@example.com', '$2b$10$example_hash_1', '0912345678', 'active'),
-('李四', 'li.si@example.com', '$2b$10$example_hash_2', '0987654321', 'active'),
-('王五', 'wang.wu@example.com', '$2b$10$example_hash_3', '0955555555', 'active');
+('系統管理員', 'admin@ecommerce.com', '$2a$10$qKn56iI4J2dRB1xLhksb2OZaxdaaLDG.5/XBFng80j.xl5PZMlt4C', '0912345678', 'active'),
+('測試用戶1', 'test1@example.com', '$2a$10$emK0iIcvSb.X1QMH8Oi06.d0h3k3VlNCO96l4ocM.IUh24iKll9q.', '0987654321', 'active'),
+('測試用戶2', 'test2@example.com', '$2a$10$emK0iIcvSb.X1QMH8Oi06.d0h3k3VlNCO96l4ocM.IUh24iKll9q.', '0955555555', 'active');
 
 -- 插入測試地址
 INSERT INTO User_Address (user_id, recipient_name, address_line, city, postal_code, country, is_default) VALUES 
-(1, '張三', '台北市信義區信義路五段7號', '台北市', '110', '台灣', true),
-(2, '李四', '新北市板橋區文化路一段188號', '新北市', '220', '台灣', true),
-(3, '王五', '高雄市左營區博愛二路777號', '高雄市', '813', '台灣', true);
+(1, '系統管理員', '台北市信義區信義路五段7號', '台北市', '110', '台灣', true),
+(2, '測試用戶1', '新北市板橋區文化路一段188號', '新北市', '220', '台灣', true),
+(3, '測試用戶2', '高雄市左營區博愛二路777號', '高雄市', '813', '台灣', true);
+
+-- 分配用戶角色
+INSERT INTO user_roles (user_id, role_id) VALUES
+(1, (SELECT role_id FROM roles WHERE role_name = 'admin')),  -- 系統管理員
+(2, (SELECT role_id FROM roles WHERE role_name = 'customer')), -- 測試用戶1
+(3, (SELECT role_id FROM roles WHERE role_name = 'customer')); -- 測試用戶2
 
 -- 插入測試優惠券
 INSERT INTO Coupons (code, discount_percent, valid_from, valid_to) VALUES 
@@ -425,14 +561,41 @@ INSERT INTO Coupons (code, discount_percent, valid_from, valid_to) VALUES
 ('SUMMER20', 20.00, NOW(), NOW() + INTERVAL '60 days'),
 ('VIP15', 15.00, NOW(), NOW() + INTERVAL '90 days');
 
--- 建立資料庫使用者
-CREATE USER ecommerce_user WITH PASSWORD 'ecommerce_password';
-GRANT ALL PRIVILEGES ON DATABASE ecommerce_db TO ecommerce_user;
+-- 建立資料庫使用者（如果不存在）
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'ecommerce_user') THEN
+        CREATE USER ecommerce_user WITH PASSWORD 'ecommerce_password';
+    END IF;
+END
+$$;
+
+-- 授予權限
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ecommerce_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ecommerce_user;
 
+-- 驗證初始化結果
+\echo '驗證 RBAC 系統初始化...'
+SELECT 
+    u.name as user_name,
+    u.email,
+    r.role_name,
+    COUNT(p.permission_name) as permission_count
+FROM users u
+JOIN user_roles ur ON u.user_id = ur.user_id
+JOIN roles r ON ur.role_id = r.role_id
+JOIN role_permissions rp ON r.role_id = rp.role_id
+JOIN permissions p ON rp.permission_id = p.permission_id
+WHERE ur.is_active = true
+GROUP BY u.user_id, u.name, u.email, r.role_name
+ORDER BY u.user_id;
+
 -- 完成初始化
 \echo 'PostgreSQL 電商系統資料庫初始化完成！'
-\echo '資料庫名稱: ecommerce_db'
-\echo '使用者: ecommerce_user'
+\echo '資料庫名稱: ecommerce_transactions'
+\echo '使用者: admin'
 \echo '已建立所有必要的表和索引'
+\echo 'RBAC 權限系統已初始化'
+\echo '測試帳號:'
+\echo '  管理員: admin@ecommerce.com / password123'
+\echo '  測試用戶: test1@example.com / password123'
