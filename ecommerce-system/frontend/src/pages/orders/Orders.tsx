@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   Row, 
   Col, 
-  Card, 
   Table, 
   Button, 
   Input, 
@@ -22,11 +21,14 @@ import {
   CheckOutlined,
   TruckOutlined,
   CloseOutlined,
-  ReloadOutlined,
   ExportOutlined,
-  PlusOutlined
+  PlusOutlined,
+  ShoppingOutlined,
+  DollarOutlined,
+  ClockCircleOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons';
-import PageHeader from '../../components/common/PageHeader';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import { useOrders, useCreateOrder, useUpdateOrder, useOrderStats } from '../../hooks/useApi';
 import OrderService from '../../services/orderService';
 import './Orders.less';
@@ -312,117 +314,103 @@ const Orders: React.FC = () => {
     }
   };
 
-  return (
-    <div className="orders-page">
-      <PageHeader
-        title="訂單清單"
-        subtitle="管理訂單狀態和物流信息"
-        extra={
-          <Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>
-              新增訂單
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button icon={<ExportOutlined />} onClick={handleExport}>
-              導出
-            </Button>
-          </Space>
-        }
-      />
+  // 統計數據配置
+  const statsConfig = [
+    {
+      label: '總訂單',
+      value: stats.total || 0,
+      icon: <ShoppingOutlined />,
+      color: 'var(--text-primary)'
+    },
+    {
+      label: '待處理',
+      value: stats.pending || 0,
+      icon: <ClockCircleOutlined />,
+      color: 'var(--warning-500)'
+    },
+    {
+      label: '已發貨',
+      value: stats.shipped || 0,
+      icon: <TruckOutlined />,
+      color: 'var(--info-500)'
+    },
+    {
+      label: '總收入',
+      value: `$${(stats.totalRevenue || 0).toLocaleString()}`,
+      icon: <DollarOutlined />,
+      color: 'var(--success-500)'
+    }
+  ];
 
-      {/* 統計卡片 */}
-      <Row gutter={[16, 16]} className="stats-row">
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value">{stats.total || 0}</div>
-              <div className="stat-label">總訂單</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value" style={{ color: '#52c41a' }}>
-                {stats.pending || 0}
-              </div>
-              <div className="stat-label">待處理</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value" style={{ color: '#1890ff' }}>
-                {stats.shipped || 0}
-              </div>
-              <div className="stat-label">已發貨</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value" style={{ color: '#722ed1' }}>
-                {(stats.totalRevenue || 0).toLocaleString()}
-              </div>
-              <div className="stat-label">總收入</div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
-      <Card className="orders-content">
-        {/* 搜索和篩選 */}
-        <div className="orders-filters">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索訂單號或客戶信息"
-                allowClear
-                onSearch={handleSearch}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={24} sm={6} md={4}>
-              <Select
-                placeholder="選擇狀態"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={handleStatusChange}
-              >
-                <Option value="pending">待確認</Option>
-                <Option value="confirmed">已確認</Option>
-                <Option value="processing">處理中</Option>
-                <Option value="shipped">已發貨</Option>
-                <Option value="delivered">已送達</Option>
-                <Option value="cancelled">已取消</Option>
-                <Option value="returned">已退貨</Option>
-              </Select>
-            </Col>
-          </Row>
-        </div>
-
-        {/* 訂單表格 */}
-        <Table
-          columns={columns}
-          dataSource={orders}
-          loading={isLoading}
-          rowKey="id"
-          pagination={{
-            current: searchParams.page,
-            pageSize: searchParams.limit,
-            total: total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 1200 }}
+  // 篩選區域
+  const filtersContent = (
+    <Row gutter={[16, 16]} align="middle">
+      <Col xs={24} sm={12} md={8}>
+        <Input.Search
+          placeholder="搜索訂單號或客戶信息"
+          allowClear
+          onSearch={handleSearch}
+          style={{ width: '100%' }}
         />
-      </Card>
+      </Col>
+      <Col xs={24} sm={6} md={4}>
+        <Select
+          placeholder="選擇狀態"
+          allowClear
+          style={{ width: '100%' }}
+          onChange={handleStatusChange}
+        >
+          <Option value="pending">待確認</Option>
+          <Option value="confirmed">已確認</Option>
+          <Option value="processing">處理中</Option>
+          <Option value="shipped">已發貨</Option>
+          <Option value="delivered">已送達</Option>
+          <Option value="cancelled">已取消</Option>
+          <Option value="returned">已退貨</Option>
+        </Select>
+      </Col>
+    </Row>
+  );
+
+  // 操作按鈕
+  const extraActions = (
+    <Space>
+      <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>
+        新增訂單
+      </Button>
+      <Button icon={<ExportOutlined />} onClick={handleExport}>
+        導出
+      </Button>
+    </Space>
+  );
+
+  return (
+    <UnifiedPageLayout
+      title="訂單清單"
+      subtitle="管理訂單狀態和物流信息"
+      extra={extraActions}
+      stats={statsConfig}
+      filters={filtersContent}
+      onRefresh={() => refetch()}
+      loading={isLoading}
+    >
+      {/* 訂單表格 */}
+      <Table
+        columns={columns}
+        dataSource={orders}
+        loading={isLoading}
+        rowKey="id"
+        pagination={{
+          current: searchParams.page,
+          pageSize: searchParams.limit,
+          total: total,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
+        }}
+        onChange={handleTableChange}
+        scroll={{ x: 1200 }}
+      />
 
       {/* 訂單詳情彈窗 */}
       <Modal
@@ -581,7 +569,7 @@ const Orders: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

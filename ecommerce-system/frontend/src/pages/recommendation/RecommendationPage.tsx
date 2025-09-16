@@ -19,14 +19,17 @@ import {
   BarChartOutlined,
   ReloadOutlined,
   ShoppingCartOutlined,
-  StarOutlined
+  StarOutlined,
+  RobotOutlined,
+  BulbOutlined,
+  ExperimentOutlined
 } from '@ant-design/icons';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import RecommendationList from '../../components/recommendation/RecommendationList';
 import AiService, { 
   RecommendationItem,
   RecommendationType 
 } from '../../services/aiService';
-import PageHeader from '../../components/common/PageHeader';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -127,33 +130,74 @@ const RecommendationPage: React.FC = () => {
     return icons[type] || <ThunderboltOutlined />;
   };
 
-  return (
-    <div className="recommendation-page">
-      <PageHeader
-        title="AI 智能推薦"
-        subtitle="基於機器學習算法，為您提供個性化商品推薦"
-        icon={<ThunderboltOutlined />}
-      />
+  // 統計數據配置
+  const statsConfig = analytics ? [
+    {
+      label: '總推薦數',
+      value: analytics.total_recommendations || 0,
+      icon: <ThunderboltOutlined />,
+      color: 'var(--primary-500)'
+    },
+    {
+      label: '平均點擊率',
+      value: `${((analytics.average_ctr || 0) * 100).toFixed(1)}%`,
+      icon: <EyeOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: 'AI 模型',
+      value: analytics.active_models || 0,
+      icon: <RobotOutlined />,
+      color: 'var(--info-500)'
+    },
+    {
+      label: '推薦準確度',
+      value: `${((analytics.accuracy || 0) * 100).toFixed(1)}%`,
+      icon: <BulbOutlined />,
+      color: 'var(--warning-500)'
+    }
+  ] : [];
 
-      {/* 分析統計 */}
-      <Card title="推薦效果分析" style={{ marginBottom: 24 }}>
-        <Spin spinning={loading}>
-          {error && (
-            <Alert
-              message="載入失敗"
-              description={error}
-              type="error"
-              showIcon
-              style={{ marginBottom: 16 }}
-              action={
-                <Button size="small" onClick={loadAnalytics}>
-                  重試
-                </Button>
-              }
-            />
-          )}
-          
-          {analytics && (
+  // 操作按鈕
+  const extraActions = (
+    <Space>
+      <Button icon={<ReloadOutlined />} onClick={loadAnalytics} loading={loading}>
+        刷新數據
+      </Button>
+      <Button type="primary" icon={<ExperimentOutlined />}>
+        訓練模型
+      </Button>
+    </Space>
+  );
+
+  return (
+    <UnifiedPageLayout
+      title="AI 推薦商品"
+      subtitle="基於機器學習算法，為您提供個性化商品推薦"
+      extra={extraActions}
+      stats={statsConfig}
+      onRefresh={loadAnalytics}
+      loading={loading}
+    >
+      {error && (
+        <Alert
+          message="載入失敗"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          action={
+            <Button size="small" onClick={loadAnalytics}>
+              重試
+            </Button>
+          }
+        />
+      )}
+
+      {/* 推薦效果分析 */}
+      {analytics && (
+        <Card title="推薦效果分析" style={{ marginBottom: 24 }}>
+          <Spin spinning={loading}>
             <div>
               {renderAnalyticsStats()}
               
@@ -163,9 +207,9 @@ const RecommendationPage: React.FC = () => {
                 </Text>
               </div>
             </div>
-          )}
-        </Spin>
-      </Card>
+          </Spin>
+        </Card>
+      )}
 
       {/* 推薦內容 */}
       <Tabs 
@@ -231,7 +275,7 @@ const RecommendationPage: React.FC = () => {
           }
         ]}
       />
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

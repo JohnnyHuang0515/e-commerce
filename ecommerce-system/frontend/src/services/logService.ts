@@ -78,6 +78,12 @@ export class LogService {
       const response = await logApi.post('/v1/logs/cleanup', { days });
       return response.data;
   }
+
+  // 導出日誌
+  static async exportLogs(params: LogQueryParams = {}): Promise<ApiResponse<void>> {
+    const response = await logApi.post('/v1/logs/export', params);
+    return response.data;
+  }
 }
 
 export default LogService;

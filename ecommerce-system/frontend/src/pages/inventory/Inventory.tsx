@@ -28,7 +28,12 @@ import {
   WarningOutlined,
   SearchOutlined,
   ReloadOutlined,
+  ShopOutlined,
+  ExclamationCircleOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import { 
   useInventories, 
   useCreateInventory, 
@@ -508,20 +513,76 @@ const Inventory: React.FC = () => {
     },
   ];
 
-  return (
-    <div style={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)',
-      padding: '24px'
-    }}>
-      {/* 頁面標題 */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>庫存管理</h2>
-        <p style={{ margin: '8px 0 0 0', color: '#b0b0b0', fontSize: '14px' }}>
-          查看和管理商品庫存狀態、庫存數量及庫存警告
-        </p>
-      </div>
+  // 統計數據配置
+  const statsConfig = [
+    {
+      label: '總商品數',
+      value: inventoriesData?.data?.total || 0,
+      icon: <ShopOutlined />,
+      color: 'var(--primary-500)'
+    },
+    {
+      label: '缺貨商品',
+      value: outOfStockAlerts?.data?.length || 0,
+      icon: <ExclamationCircleOutlined />,
+      color: 'var(--error-500)'
+    },
+    {
+      label: '庫存不足',
+      value: lowStockAlerts?.data?.length || 0,
+      icon: <WarningOutlined />,
+      color: 'var(--warning-500)'
+    },
+    {
+      label: '庫存正常',
+      value: (inventoriesData?.data?.total || 0) - (outOfStockAlerts?.data?.length || 0) - (lowStockAlerts?.data?.length || 0),
+      icon: <CheckCircleOutlined />,
+      color: 'var(--success-500)'
+    }
+  ];
 
+  // 操作按鈕
+  const extraActions = (
+    <Space>
+      <Button icon={<PlusOutlined />} type="primary">
+        新增庫存
+      </Button>
+    </Space>
+  );
+
+  // 篩選器內容
+  const filtersContent = (
+    <Form
+      layout="inline"
+      onFinish={handleSearch}
+    >
+      <Form.Item name="search">
+        <Input placeholder="搜尋商品名稱或SKU" style={{ width: 200 }} />
+      </Form.Item>
+      <Form.Item name="lowStock">
+        <Select placeholder="庫存狀態" allowClear style={{ width: 120 }}>
+          <Option value="true">庫存不足</Option>
+          <Option value="false">庫存充足</Option>
+        </Select>
+      </Form.Item>
+      <Form.Item>
+        <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+          搜尋
+        </Button>
+      </Form.Item>
+    </Form>
+  );
+
+  return (
+    <UnifiedPageLayout
+      title="庫存管理"
+      subtitle="查看和管理商品庫存狀態、庫存數量及庫存警告"
+      extra={extraActions}
+      stats={statsConfig}
+      filters={filtersContent}
+      onRefresh={() => refetch()}
+      loading={isLoading}
+    >
       {/* 警告提示 */}
       {(lowStockAlerts?.data?.length > 0 || outOfStockAlerts?.data?.length > 0) && (
         <div style={{ marginBottom: 16 }}>
@@ -555,52 +616,7 @@ const Inventory: React.FC = () => {
         </div>
       )}
 
-      <Card 
-        style={{ 
-          backgroundColor: 'rgba(45, 45, 45, 0.8)',
-          border: '1px solid #404040',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)'
-        }}
-        bodyStyle={{ 
-          backgroundColor: 'transparent',
-          padding: '24px'
-        }}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <Space>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch()}
-            >
-              刷新
-            </Button>
-          </Space>
-        </div>
-
-        <Form
-          layout="inline"
-          onFinish={handleSearch}
-          style={{ marginBottom: 16 }}
-        >
-          <Form.Item name="search">
-            <Input placeholder="搜尋商品名稱或SKU" style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="lowStock">
-            <Select placeholder="庫存狀態" allowClear style={{ width: 120 }}>
-              <Option value="true">庫存不足</Option>
-              <Option value="false">庫存充足</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-              搜尋
-            </Button>
-          </Form.Item>
-        </Form>
-
-        <Table
+      <Table
           columns={columns}
           dataSource={inventoriesData?.data?.items || []}
           loading={isLoading}
@@ -629,7 +645,6 @@ const Inventory: React.FC = () => {
             }
           }}
         />
-      </Card>
 
       {/* 新增/編輯庫存 Modal */}
       <Modal
@@ -871,7 +886,7 @@ const Inventory: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

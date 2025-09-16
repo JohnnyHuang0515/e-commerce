@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Row, 
   Col, 
-  Card, 
+  Card,
   Select, 
   DatePicker, 
   Space, 
@@ -15,9 +15,12 @@ import {
   BarChartOutlined,
   LineChartOutlined,
   PieChartOutlined,
-  ReloadOutlined
+  DollarOutlined,
+  ShoppingOutlined,
+  UserOutlined,
+  RiseOutlined
 } from '@ant-design/icons';
-import PageHeader from '../../components/common/PageHeader';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import StatCard from '../../components/common/StatCard';
 import { useDashboardAnalytics } from '../../hooks/useApi';
 import './Analytics.less';
@@ -48,38 +51,67 @@ const Analytics: React.FC = () => {
     refetch();
   };
 
-  return (
-    <div className="analytics-page">
-      <PageHeader
-        title="數據分析"
-        subtitle="業務數據分析和趨勢洞察"
-        extra={
-          <Space>
-            <Select
-              value={period}
-              onChange={handlePeriodChange}
-              style={{ width: 120 }}
-            >
-              <Option value="1d">今天</Option>
-              <Option value="7d">近7天</Option>
-              <Option value="30d">近30天</Option>
-              <Option value="90d">近90天</Option>
-              <Option value="custom">自定義</Option>
-            </Select>
-            {period === 'custom' && (
-              <RangePicker
-                value={dateRange}
-                onChange={handleDateRangeChange}
-                placeholder={['開始日期', '結束日期']}
-              />
-            )}
-            <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-              刷新
-            </Button>
-          </Space>
-        }
-      />
+  // 統計數據配置
+  const statsConfig = [
+    {
+      label: '銷售額',
+      value: analytics?.sales?.total ? `$${analytics.sales.total.toLocaleString()}` : '$0',
+      icon: <DollarOutlined />,
+      color: 'var(--primary-500)'
+    },
+    {
+      label: '訂單數',
+      value: analytics?.orders?.total || 0,
+      icon: <ShoppingOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: '用戶數',
+      value: analytics?.users?.total || 0,
+      icon: <UserOutlined />,
+      color: 'var(--warning-500)'
+    },
+    {
+      label: '商品數',
+      value: analytics?.products?.total || 0,
+      icon: <RiseOutlined />,
+      color: 'var(--error-500)'
+    }
+  ];
 
+  // 篩選區域
+  const filtersContent = (
+    <Space>
+      <Select
+        value={period}
+        onChange={handlePeriodChange}
+        style={{ width: 120 }}
+      >
+        <Option value="1d">今天</Option>
+        <Option value="7d">近7天</Option>
+        <Option value="30d">近30天</Option>
+        <Option value="90d">近90天</Option>
+        <Option value="custom">自定義</Option>
+      </Select>
+      {period === 'custom' && (
+        <RangePicker
+          value={dateRange}
+          onChange={handleDateRangeChange}
+          placeholder={['開始日期', '結束日期']}
+        />
+      )}
+    </Space>
+  );
+
+  return (
+    <UnifiedPageLayout
+      title="數據分析"
+      subtitle="業務數據分析和趨勢洞察"
+      stats={statsConfig}
+      filters={filtersContent}
+      onRefresh={handleRefresh}
+      loading={isLoading}
+    >
       {error && (
         <Alert
           message="數據加載失敗"
@@ -93,54 +125,6 @@ const Analytics: React.FC = () => {
 
       <Spin spinning={isLoading}>
         <div className="analytics-content">
-          {/* 關鍵指標 */}
-          <Row gutter={[24, 24]} className="metrics-row">
-            <Col xs={24} sm={12} lg={6}>
-              <StatCard
-                title="銷售額"
-                value={analytics?.sales?.total || 0}
-                prefix=""
-                trend={analytics?.sales?.trend ? { 
-                  value: analytics.sales.trend, 
-                  isPositive: analytics.sales.trend > 0 
-                } : undefined}
-                className="primary"
-              />
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <StatCard
-                title="訂單數"
-                value={analytics?.orders?.total || 0}
-                trend={analytics?.orders?.trend ? { 
-                  value: analytics.orders.trend, 
-                  isPositive: analytics.orders.trend > 0 
-                } : undefined}
-                className="success"
-              />
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <StatCard
-                title="用戶數"
-                value={analytics?.users?.total || 0}
-                trend={analytics?.users?.trend ? { 
-                  value: analytics.users.trend, 
-                  isPositive: analytics.users.trend > 0 
-                } : undefined}
-                className="warning"
-              />
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <StatCard
-                title="商品數"
-                value={analytics?.products?.total || 0}
-                trend={analytics?.products?.trend ? { 
-                  value: analytics.products.trend, 
-                  isPositive: analytics.products.trend > 0 
-                } : undefined}
-                className="error"
-              />
-            </Col>
-          </Row>
 
           {/* 圖表區域 */}
           <Row gutter={[24, 24]} className="charts-row">
@@ -246,7 +230,7 @@ const Analytics: React.FC = () => {
           </Row>
         </div>
       </Spin>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

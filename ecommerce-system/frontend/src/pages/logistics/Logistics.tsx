@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Card,
   Table,
   Button,
   Space,
@@ -23,9 +22,13 @@ import {
   DeleteOutlined,
   EyeOutlined,
   SearchOutlined,
-  ReloadOutlined,
   EnvironmentOutlined,
+  TruckOutlined,
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import { useShipments, useCreateShipment, useUpdateShipment, useDeleteShipment } from '../../hooks/useApi';
 import { Shipment, ShipmentCreateRequest } from '../../services/logisticsService';
 import type { ColumnsType } from 'antd/es/table';
@@ -348,26 +351,51 @@ const Logistics: React.FC = () => {
     },
   ];
 
+  // 統計數據配置
+  const shipments = shipmentsData?.data?.items || [];
+  const statsConfig = [
+    {
+      label: '總物流',
+      value: shipments.length,
+      icon: <TruckOutlined />,
+      color: 'var(--text-primary)'
+    },
+    {
+      label: '進行中',
+      value: shipments.filter(s => s.status === 'in_transit').length,
+      icon: <ClockCircleOutlined />,
+      color: 'var(--warning-500)'
+    },
+    {
+      label: '已送達',
+      value: shipments.filter(s => s.status === 'delivered').length,
+      icon: <CheckCircleOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: '異常',
+      value: shipments.filter(s => s.status === 'exception').length,
+      icon: <ExclamationCircleOutlined />,
+      color: 'var(--error-500)'
+    }
+  ];
+
+  // 操作按鈕
+  const extraActions = (
+    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+      新增物流
+    </Button>
+  );
+
   return (
-    <div>
-      <Card>
-        <div style={{ marginBottom: 16 }}>
-          <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAdd}
-            >
-              新增物流
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch()}
-            >
-              刷新
-            </Button>
-          </Space>
-        </div>
+    <UnifiedPageLayout
+      title="物流管理"
+      subtitle="管理訂單物流和配送狀態"
+      extra={extraActions}
+      stats={statsConfig}
+      onRefresh={() => refetch()}
+      loading={isLoading}
+    >
 
         <Form
           layout="inline"
@@ -428,7 +456,6 @@ const Logistics: React.FC = () => {
               `第 ${range[0]}-${range[1]} 項，共 ${total} 項`,
           }}
         />
-      </Card>
 
       {/* 新增/編輯物流 Modal */}
       <Modal
@@ -712,7 +739,7 @@ const Logistics: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

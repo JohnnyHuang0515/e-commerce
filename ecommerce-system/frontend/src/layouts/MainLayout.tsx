@@ -93,17 +93,6 @@ const MainLayout: React.FC = () => {
       ],
     },
     {
-      key: 'marketing-management',
-      icon: <HeartOutlined />,
-      label: '行銷管理',
-      children: [
-        {
-          key: '/recommendations',
-          label: '推薦商品配置',
-        },
-      ],
-    },
-    {
       key: 'ai-system',
       icon: <ThunderboltOutlined />,
       label: 'AI 系統',
@@ -111,6 +100,10 @@ const MainLayout: React.FC = () => {
         {
           key: '/ai-search',
           label: 'AI 智能搜尋',
+        },
+        {
+          key: '/recommendations',
+          label: 'AI 推薦商品',
         },
         {
           key: '/analytics',

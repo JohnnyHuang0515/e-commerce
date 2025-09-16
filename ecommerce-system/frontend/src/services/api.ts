@@ -1,11 +1,11 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // API 基礎配置 - 直接連接到新的統一 Node.js API 服務
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:3002/api';
 const API_TIMEOUT = 30000; // 增加到 30 秒
 
 // 統一 API 路徑配置 - 對應新的後端 API 架構
-const API_PATHS = {
+export const API_PATHS = {
   AUTH: '/v1/auth',
   USERS: '/v1/users',
   PRODUCTS: '/v1/products',

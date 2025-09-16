@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   Row, 
   Col, 
-  Card, 
   Table, 
   Button, 
   Input, 
@@ -20,11 +19,14 @@ import {
   EditOutlined, 
   DeleteOutlined, 
   UserOutlined,
-  ReloadOutlined,
   ExportOutlined,
-  KeyOutlined
+  KeyOutlined,
+  TeamOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  GlobalOutlined
 } from '@ant-design/icons';
-import PageHeader from '../../components/common/PageHeader';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useUserStats } from '../../hooks/useApi';
 import AuthService from '../../services/authService';
 import './Users.less';
@@ -319,125 +321,111 @@ const Users: React.FC = () => {
     }
   };
 
-  return (
-    <div className="users-page">
-      <PageHeader
-        title="用戶管理"
-        subtitle="管理用戶賬戶、角色和權限"
-        extra={
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button icon={<ExportOutlined />} onClick={handleExport}>
-              導出
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增用戶
-            </Button>
-          </Space>
-        }
-      />
+  // 統計數據配置
+  const statsConfig = [
+    {
+      label: '總用戶',
+      value: stats.total || 0,
+      icon: <TeamOutlined />,
+      color: 'var(--text-primary)'
+    },
+    {
+      label: '活躍用戶',
+      value: stats.active || 0,
+      icon: <CheckCircleOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: '本月新增',
+      value: stats.newThisMonth || 0,
+      icon: <ClockCircleOutlined />,
+      color: 'var(--info-500)'
+    },
+    {
+      label: '在線用戶',
+      value: stats.onlineNow || 0,
+      icon: <GlobalOutlined />,
+      color: 'var(--warning-500)'
+    }
+  ];
 
-      {/* 統計卡片 */}
-      <Row gutter={[16, 16]} className="stats-row">
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value">{stats.total || 0}</div>
-              <div className="stat-label">總用戶</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value" style={{ color: '#52c41a' }}>
-                {stats.active || 0}
-              </div>
-              <div className="stat-label">活躍用戶</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value" style={{ color: '#1890ff' }}>
-                {stats.newThisMonth || 0}
-              </div>
-              <div className="stat-label">本月新增</div>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <div className="stat-item">
-              <div className="stat-value" style={{ color: '#722ed1' }}>
-                {stats.onlineNow || 0}
-              </div>
-              <div className="stat-label">在線用戶</div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
-      <Card className="users-content">
-        {/* 搜索和篩選 */}
-        <div className="users-filters">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索用戶姓名或郵箱"
-                allowClear
-                onSearch={handleSearch}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={24} sm={6} md={4}>
-              <Select
-                placeholder="選擇角色"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={handleRoleChange}
-              >
-                <Option value="admin">管理員</Option>
-                <Option value="moderator">版主</Option>
-                <Option value="user">用戶</Option>
-              </Select>
-            </Col>
-            <Col xs={24} sm={6} md={4}>
-              <Select
-                placeholder="選擇狀態"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={handleStatusChange}
-              >
-                <Option value="active">正常</Option>
-                <Option value="inactive">未激活</Option>
-                <Option value="suspended">已封禁</Option>
-              </Select>
-            </Col>
-          </Row>
-        </div>
-
-        {/* 用戶表格 */}
-        <Table
-          columns={columns}
-          dataSource={users}
-          loading={isLoading}
-          rowKey="id"
-          pagination={{
-            current: searchParams.page,
-            pageSize: searchParams.limit,
-            total: total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 1000 }}
+  // 篩選區域
+  const filtersContent = (
+    <Row gutter={[16, 16]} align="middle">
+      <Col xs={24} sm={12} md={8}>
+        <Input.Search
+          placeholder="搜索用戶姓名或郵箱"
+          allowClear
+          onSearch={handleSearch}
+          style={{ width: '100%' }}
         />
-      </Card>
+      </Col>
+      <Col xs={24} sm={6} md={4}>
+        <Select
+          placeholder="選擇角色"
+          allowClear
+          style={{ width: '100%' }}
+          onChange={handleRoleChange}
+        >
+          <Option value="admin">管理員</Option>
+          <Option value="moderator">版主</Option>
+          <Option value="user">用戶</Option>
+        </Select>
+      </Col>
+      <Col xs={24} sm={6} md={4}>
+        <Select
+          placeholder="選擇狀態"
+          allowClear
+          style={{ width: '100%' }}
+          onChange={handleStatusChange}
+        >
+          <Option value="active">正常</Option>
+          <Option value="inactive">未激活</Option>
+          <Option value="suspended">已封禁</Option>
+        </Select>
+      </Col>
+    </Row>
+  );
+
+  // 操作按鈕
+  const extraActions = (
+    <Space>
+      <Button icon={<ExportOutlined />} onClick={handleExport}>
+        導出
+      </Button>
+      <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+        新增用戶
+      </Button>
+    </Space>
+  );
+
+  return (
+    <UnifiedPageLayout
+      title="用戶管理"
+      subtitle="管理用戶賬戶、角色和權限"
+      extra={extraActions}
+      stats={statsConfig}
+      filters={filtersContent}
+      onRefresh={() => refetch()}
+      loading={isLoading}
+    >
+      {/* 用戶表格 */}
+      <Table
+        columns={columns}
+        dataSource={users}
+        loading={isLoading}
+        rowKey="id"
+        pagination={{
+          current: searchParams.page,
+          pageSize: searchParams.limit,
+          total: total,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
+        }}
+        onChange={handleTableChange}
+        scroll={{ x: 1000 }}
+      />
 
       {/* 新增/編輯用戶彈窗 */}
       <Modal
@@ -539,7 +527,7 @@ const Users: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

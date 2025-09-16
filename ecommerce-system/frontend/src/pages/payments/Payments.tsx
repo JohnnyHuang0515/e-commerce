@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Card,
   Table,
   Button,
   Space,
@@ -22,8 +21,12 @@ import {
   EyeOutlined,
   UndoOutlined,
   SearchOutlined,
-  ReloadOutlined,
+  DollarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import { usePayments, useCreatePayment, useUpdatePayment, useDeletePayment, useRefundPayment } from '../../hooks/useApi';
 import { Payment, PaymentCreateRequest } from '../../services/paymentService';
 import type { ColumnsType } from 'antd/es/table';
@@ -312,26 +315,51 @@ const Payments: React.FC = () => {
     },
   ];
 
+  // 統計數據配置
+  const payments = paymentsData?.data?.items || [];
+  const statsConfig = [
+    {
+      label: '總支付',
+      value: payments.length,
+      icon: <DollarOutlined />,
+      color: 'var(--text-primary)'
+    },
+    {
+      label: '成功支付',
+      value: payments.filter(p => p.status === 'completed').length,
+      icon: <CheckCircleOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: '待處理',
+      value: payments.filter(p => p.status === 'pending').length,
+      icon: <ClockCircleOutlined />,
+      color: 'var(--warning-500)'
+    },
+    {
+      label: '失敗支付',
+      value: payments.filter(p => p.status === 'failed').length,
+      icon: <ExclamationCircleOutlined />,
+      color: 'var(--error-500)'
+    }
+  ];
+
+  // 操作按鈕
+  const extraActions = (
+    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+      新增支付
+    </Button>
+  );
+
   return (
-    <div>
-      <Card>
-        <div style={{ marginBottom: 16 }}>
-          <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAdd}
-            >
-              新增支付
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch()}
-            >
-              刷新
-            </Button>
-          </Space>
-        </div>
+    <UnifiedPageLayout
+      title="支付管理"
+      subtitle="管理訂單支付和退款處理"
+      extra={extraActions}
+      stats={statsConfig}
+      onRefresh={() => refetch()}
+      loading={isLoading}
+    >
 
         <Form
           layout="inline"
@@ -391,7 +419,6 @@ const Payments: React.FC = () => {
               `第 ${range[0]}-${range[1]} 項，共 ${total} 項`,
           }}
         />
-      </Card>
 
       {/* 新增/編輯支付 Modal */}
       <Modal
@@ -531,7 +558,7 @@ const Payments: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

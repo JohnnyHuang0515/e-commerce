@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Card,
   Table,
   Button,
   Space,
@@ -15,7 +14,6 @@ import {
   Tabs,
   Row,
   Col,
-  Statistic,
   Typography,
   Divider,
   Tooltip,
@@ -28,9 +26,13 @@ import {
   UserOutlined,
   SafetyOutlined,
   SettingOutlined,
-  ReloadOutlined,
   InfoCircleOutlined,
+  SecurityScanOutlined,
+  TeamOutlined,
+  KeyOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import {
   usePermissions,
   useCreatePermission,
@@ -465,97 +467,79 @@ const Permissions: React.FC = () => {
     }
   };
 
+  // 統計數據配置
+  const statsConfig = [
+    {
+      label: '總權限數',
+      value: statsData?.totalPermissions || 0,
+      icon: <SafetyOutlined />,
+      color: 'var(--text-primary)'
+    },
+    {
+      label: '總角色數',
+      value: statsData?.totalRoles || 0,
+      icon: <TeamOutlined />,
+      color: 'var(--info-500)'
+    },
+    {
+      label: '用戶角色分配',
+      value: statsData?.totalUserRoles || 0,
+      icon: <KeyOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: '活躍權限',
+      value: statsData?.permissionsByModule ? Object.keys(statsData.permissionsByModule).length : 0,
+      icon: <SecurityScanOutlined />,
+      color: 'var(--warning-500)'
+    }
+  ];
+
+  // 操作按鈕
+  const extraActions = (
+    <Space>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={handleCreatePermission}
+      >
+        新增權限
+      </Button>
+      <Button
+        icon={<PlusOutlined />}
+        onClick={handleCreateRole}
+      >
+        新增角色
+      </Button>
+      <Button
+        icon={<PlusOutlined />}
+        onClick={handleCreateUserRole}
+      >
+        分配角色
+      </Button>
+      <Button
+        icon={<DatabaseOutlined />}
+        onClick={handleInitializeData}
+        loading={initializeDataMutation.isPending}
+      >
+        初始化數據
+      </Button>
+    </Space>
+  );
+
   return (
-    <div className="permissions-page">
-      <div className="page-header">
-        <Title level={2}>
-          <SafetyOutlined /> 權限管理
-        </Title>
-        <Text type="secondary">
-          管理系統權限、角色和用戶權限分配
-        </Text>
-      </div>
-
-      {/* 統計卡片 */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="總權限數"
-              value={statsData?.totalPermissions || 0}
-              prefix={<SafetyOutlined />}
-              loading={statsLoading}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="總角色數"
-              value={statsData?.totalRoles || 0}
-              prefix={<UserOutlined />}
-              loading={statsLoading}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="用戶角色分配"
-              value={statsData?.totalUserRoles || 0}
-              prefix={<SettingOutlined />}
-              loading={statsLoading}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="活躍權限"
-              value={statsData?.permissionsByModule ? Object.keys(statsData.permissionsByModule).length : 0}
-              prefix={<InfoCircleOutlined />}
-              loading={statsLoading}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Card>
-        <div className="table-header">
-          <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreatePermission}
-            >
-              新增權限
-            </Button>
-            <Button
-              icon={<PlusOutlined />}
-              onClick={handleCreateRole}
-            >
-              新增角色
-            </Button>
-            <Button
-              icon={<PlusOutlined />}
-              onClick={handleCreateUserRole}
-            >
-              分配角色
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={handleInitializeData}
-              loading={initializeDataMutation.isPending}
-            >
-              初始化數據
-            </Button>
-          </Space>
-        </div>
-
-        <Divider />
-
-        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
-      </Card>
+    <UnifiedPageLayout
+      title="權限管理"
+      subtitle="管理系統權限、角色和用戶權限分配"
+      extra={extraActions}
+      stats={statsConfig}
+      onRefresh={() => {
+        // 重新獲取所有數據
+        window.location.reload();
+      }}
+      loading={statsLoading}
+    >
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
       {/* 權限編輯彈窗 */}
       <Modal
@@ -751,7 +735,7 @@ const Permissions: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 

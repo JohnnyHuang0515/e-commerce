@@ -18,7 +18,7 @@ const postgresPool = new Pool({
 
 // MongoDB 連接 (無認證模式)
 const mongoClient = new MongoClient(
-  process.env.MONGODB_URI || 'mongodb://mongo:27017/ecommerce'
+  process.env.MONGODB_URI || 'mongodb://localhost:27017/ecommerce'
 );
 
 // Redis 連接

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   Row, 
   Col, 
-  Card, 
   Table, 
   Button, 
   Input, 
@@ -22,9 +21,12 @@ import {
   EditOutlined, 
   DeleteOutlined, 
   EyeOutlined,
-  ReloadOutlined
+  ShoppingOutlined,
+  DollarOutlined,
+  InboxOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons';
-import PageHeader from '../../components/common/PageHeader';
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import ImageUpload from '../../components/common/ImageUpload';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../../hooks/useApi';
 import { useCategories } from '../../hooks/useCategories';
@@ -621,141 +623,108 @@ const Products: React.FC = () => {
     }
   };
 
-  return (
-    <div 
-      className="products-page"
-      style={{ 
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)',
-        padding: '24px'
-      }}
-    >
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>商品列表</h2>
-        <p style={{ margin: '8px 0 0 0', color: '#b0b0b0', fontSize: '14px' }}>
-          查看和管理商品信息、庫存和狀態
-        </p>
-        <div style={{ marginTop: 16 }}>
-          <Space>
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={() => refetch()}
-              style={{ color: '#fff', borderColor: '#404040' }}
-            >
-              刷新
-            </Button>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
-              onClick={handleAdd}
-              style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}
-            >
-              新增商品
-            </Button>
-          </Space>
-        </div>
-      </div>
+  // 統計數據配置
+  const statsConfig = [
+    {
+      label: '總商品',
+      value: total,
+      icon: <ShoppingOutlined />,
+      color: 'var(--text-primary)'
+    },
+    {
+      label: '上架商品',
+      value: products.filter(p => p.status === 'active').length,
+      icon: <CheckCircleOutlined />,
+      color: 'var(--success-500)'
+    },
+    {
+      label: '庫存不足',
+      value: products.filter(p => p.stock < 10).length,
+      icon: <InboxOutlined />,
+      color: 'var(--warning-500)'
+    },
+    {
+      label: '平均價格',
+      value: products.length > 0 ? `$${(products.reduce((sum, p) => sum + Number(p.price), 0) / products.length).toFixed(2)}` : '$0.00',
+      icon: <DollarOutlined />,
+      color: 'var(--info-500)'
+    }
+  ];
 
-      <Card 
-        className="products-content"
-        style={{ 
-          backgroundColor: 'rgba(45, 45, 45, 0.8)',
-          border: '1px solid #404040',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)'
-        }}
-        bodyStyle={{ 
-          backgroundColor: 'transparent',
-          padding: '24px'
-        }}
-      >
-        {/* 搜索和篩選 */}
-        <div className="products-filters" style={{ marginBottom: 24 }}>
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索商品名稱或SKU"
-                allowClear
-                onSearch={handleSearch}
-                style={{ 
-                  width: '100%',
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  borderColor: '#404040'
-                }}
-                className="dark-search"
-              />
-            </Col>
-            <Col xs={24} sm={6} md={4}>
-              <Select
-                placeholder="選擇分類"
-                allowClear
-                style={{ 
-                  width: '100%',
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  borderColor: '#404040'
-                }}
-                className="dark-select"
-                onChange={handleCategoryChange}
-              >
-                {categories.map((category) => (
-                  <Option key={category._id || category.category_id} value={category._id || category.category_id}>
-                    {category.name}
-                  </Option>
-                ))}
-              </Select>
-            </Col>
-            <Col xs={24} sm={6} md={4}>
-              <Select
-                placeholder="選擇狀態"
-                allowClear
-                style={{ 
-                  width: '100%',
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  borderColor: '#404040'
-                }}
-                className="dark-select"
-                onChange={handleStatusChange}
-              >
-                <Option key="active" value="active">上架</Option>
-                <Option key="inactive" value="inactive">下架</Option>
-                <Option key="draft" value="draft">草稿</Option>
-              </Select>
-            </Col>
-          </Row>
-        </div>
-
-        {/* 商品表格 */}
-        <Table
-          columns={columns}
-          dataSource={products}
-          loading={isLoading}
-          rowKey="public_id"
-          style={{
-            backgroundColor: 'transparent'
-          }}
-          className="dark-table"
-          pagination={{
-            current: searchParams.page,
-            pageSize: searchParams.limit,
-            total: total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
-            itemRender: (current, type, originalElement) => {
-              if (type === 'prev') {
-                return <Button style={{ color: '#fff', borderColor: '#404040' }}>上一頁</Button>;
-              }
-              if (type === 'next') {
-                return <Button style={{ color: '#fff', borderColor: '#404040' }}>下一頁</Button>;
-              }
-              return originalElement;
-            }
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 1000 }}
+  // 篩選區域
+  const filtersContent = (
+    <Row gutter={[16, 16]} align="middle">
+      <Col xs={24} sm={12} md={8}>
+        <Input.Search
+          placeholder="搜索商品名稱或SKU"
+          allowClear
+          onSearch={handleSearch}
+          style={{ width: '100%' }}
         />
-      </Card>
+      </Col>
+      <Col xs={24} sm={6} md={4}>
+        <Select
+          placeholder="選擇分類"
+          allowClear
+          style={{ width: '100%' }}
+          onChange={handleCategoryChange}
+        >
+          {categories.map((category) => (
+            <Option key={category._id || category.category_id} value={category._id || category.category_id}>
+              {category.name}
+            </Option>
+          ))}
+        </Select>
+      </Col>
+      <Col xs={24} sm={6} md={4}>
+        <Select
+          placeholder="選擇狀態"
+          allowClear
+          style={{ width: '100%' }}
+          onChange={handleStatusChange}
+        >
+          <Option key="active" value="active">上架</Option>
+          <Option key="inactive" value="inactive">下架</Option>
+          <Option key="draft" value="draft">草稿</Option>
+        </Select>
+      </Col>
+    </Row>
+  );
+
+  // 操作按鈕
+  const extraActions = (
+    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+      新增商品
+    </Button>
+  );
+
+  return (
+    <UnifiedPageLayout
+      title="商品列表"
+      subtitle="查看和管理商品信息、庫存和狀態"
+      extra={extraActions}
+      stats={statsConfig}
+      filters={filtersContent}
+      onRefresh={() => refetch()}
+      loading={isLoading}
+    >
+      {/* 商品表格 */}
+      <Table
+        columns={columns}
+        dataSource={products}
+        loading={isLoading}
+        rowKey="public_id"
+        pagination={{
+          current: searchParams.page,
+          pageSize: searchParams.limit,
+          total: total,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
+        }}
+        onChange={handleTableChange}
+        scroll={{ x: 1000 }}
+      />
 
       {/* 新增/編輯商品彈窗 */}
       <Modal
@@ -907,7 +876,7 @@ const Products: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </UnifiedPageLayout>
   );
 };
 
