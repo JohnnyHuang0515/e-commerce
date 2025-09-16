@@ -1,0 +1,303 @@
+version: '3.8'
+
+services:
+  # ==============================================
+  # PostgreSQL - 交易型資料庫
+  # ==============================================
+  postgresql:
+    image: postgres:15-alpine
+    container_name: ecommerce-postgresql
+    environment:
+      POSTGRES_DB: ecommerce_db
+      POSTGRES_USER: ecommerce_user
+      POSTGRES_PASSWORD: ecommerce_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce_user -d ecommerce_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==============================================
+  # MongoDB - 半結構化資料庫
+  # ==============================================
+  mongodb:
+    image: mongo:7.0
+    container_name: ecommerce-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: mongodb_password
+      MONGO_INITDB_DATABASE: ecommerce
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==============================================
+  # Redis - 快取與 Session 管理
+  # ==============================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: ecommerce-redis
+    command: redis-server --appendonly yes --requirepass redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==============================================
+  # MinIO - 物件儲存
+  # ==============================================
+  minio:
+    image: minio/minio:latest
+    container_name: ecommerce-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==============================================
+  # Milvus - 向量資料庫
+  # ==============================================
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: ecommerce-milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes:
+      - milvus_etcd_data:/etcd
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: ecommerce-milvus-minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /minio_data
+    volumes:
+      - milvus_minio_data:/minio_data
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  milvus-standalone:
+    image: milvusdb/milvus:v2.3.4
+    container_name: ecommerce-milvus-standalone
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      - milvus-etcd
+      - milvus-minio
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==============================================
+  # ClickHouse - 數據倉儲與分析
+  # ==============================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: ecommerce-clickhouse
+    environment:
+      CLICKHOUSE_DB: ecommerce_analytics
+      CLICKHOUSE_USER: analytics_user
+      CLICKHOUSE_PASSWORD: analytics_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==============================================
+  # 資料庫初始化服務
+  # ==============================================
+  db-init:
+    image: alpine:latest
+    container_name: ecommerce-db-init
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      milvus-standalone:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./:/scripts:ro
+    networks:
+      - ecommerce-network
+    command: |
+      sh -c '
+        echo "等待所有資料庫服務啟動..."
+        sleep 30
+        
+        echo "初始化 Redis..."
+        apk add --no-cache redis
+        redis-cli -h redis -a redis_password -f /scripts/redis-init.sh || echo "Redis 初始化完成"
+        
+        echo "初始化 MinIO..."
+        apk add --no-cache curl
+        curl -o /tmp/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+        chmod +x /tmp/mc
+        /tmp/mc alias set ecommerce http://minio:9000 minioadmin minioadmin123
+        /scripts/minio-init.sh || echo "MinIO 初始化完成"
+        
+        echo "初始化 Milvus..."
+        apk add --no-cache python3 py3-pip
+        pip3 install pymilvus numpy
+        python3 /scripts/milvus-init.py || echo "Milvus 初始化完成"
+        
+        echo "所有資料庫初始化完成！"
+      '
+    restart: "no"
+
+  # ==============================================
+  # 資料庫管理工具
+  # ==============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ecommerce-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ecommerce.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgresql
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: ecommerce-mongo-express
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: mongodb_password
+      ME_CONFIG_MONGODB_URL: mongodb://root:mongodb_password@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ecommerce-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:redis_password
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+# ==============================================
+# 網路設定
+# ==============================================
+networks:
+  ecommerce-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ==============================================
+# 資料卷設定
+# ==============================================
+volumes:
+  postgresql_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  milvus_etcd_data:
+    driver: local
+  milvus_minio_data:
+    driver: local
+  milvus_data:
+    driver: local
+  clickhouse_data:
+    driver: local
