@@ -95,7 +95,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
   
   // 檢查用戶狀態
-  if (user.status !== 1) {
+  if (user.status !== 'active' && user.status !== 1) {
     throw new UnauthorizedError('用戶帳號已被停用');
   }
   

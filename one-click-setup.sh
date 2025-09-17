@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 計數器
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 COMPLETED_STEPS=0
 FAILED_STEPS=0
 
@@ -147,10 +147,10 @@ clean_existing_data() {
     
     # 清理 PostgreSQL 數據
     echo -e "${YELLOW}  📊 清理 PostgreSQL 數據...${NC}"
-    if docker exec ecommerce-postgresql psql -U admin -d ecommerce_transactions -c "
+    if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "
         DROP SCHEMA IF EXISTS public CASCADE;
         CREATE SCHEMA public;
-        GRANT ALL ON SCHEMA public TO admin;
+        GRANT ALL ON SCHEMA public TO ecommerce_user;
         GRANT ALL ON SCHEMA public TO public;
     " > /dev/null 2>&1; then
         echo -e "${GREEN}    ✅ PostgreSQL 數據清理完成${NC}"
@@ -160,7 +160,7 @@ clean_existing_data() {
     
     # 清理 MongoDB 數據
     echo -e "${YELLOW}  📊 清理 MongoDB 數據...${NC}"
-    if docker exec ecommerce-mongodb mongosh -u admin -p password123 --authenticationDatabase admin --eval "
+    if docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --eval "
         db = db.getSiblingDB('ecommerce');
         db.dropDatabase();
         print('MongoDB 數據清理完成');
@@ -172,7 +172,7 @@ clean_existing_data() {
     
     # 清理 Redis 數據
     echo -e "${YELLOW}  📊 清理 Redis 數據...${NC}"
-    if docker exec ecommerce-redis redis-cli FLUSHALL > /dev/null 2>&1; then
+    if docker exec ecommerce-redis redis-cli -a redis_password FLUSHALL > /dev/null 2>&1; then
         echo -e "${GREEN}    ✅ Redis 數據清理完成${NC}"
     else
         echo -e "${RED}    ❌ Redis 數據清理失敗${NC}"
@@ -196,7 +196,7 @@ clean_existing_data() {
     
     # 清理 ClickHouse 數據
     echo -e "${YELLOW}  📊 清理 ClickHouse 數據...${NC}"
-    if docker exec ecommerce-clickhouse clickhouse-client --query "DROP DATABASE IF EXISTS test_db" > /dev/null 2>&1; then
+    if docker exec ecommerce-clickhouse clickhouse-client -u analytics_user --password analytics_password --query "DROP DATABASE IF EXISTS test_db" > /dev/null 2>&1; then
         echo -e "${GREEN}    ✅ ClickHouse 測試數據庫清理完成${NC}"
     else
         echo -e "${GREEN}    ✅ ClickHouse 數據清理完成（無測試數據庫）${NC}"
@@ -206,38 +206,67 @@ clean_existing_data() {
     COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
 }
 
-# 步驟4：檢查資料庫服務
-check_database_services() {
-    echo -e "${BLUE}📋 步驟 4/7: 檢查資料庫服務${NC}"
+# 步驟4：啟動資料庫服務
+start_database_services() {
+    echo -e "${BLUE}📋 步驟 4/7: 啟動資料庫服務${NC}"
     echo "=============================="
     
-    # 檢查各服務狀態
-    local services=(
-        "PostgreSQL:docker exec ecommerce-postgresql psql -U admin -d ecommerce_transactions -c 'SELECT 1;'"
-        "MongoDB:docker exec ecommerce-mongodb mongosh --eval 'db.runCommand(\"ping\")'"
-        "Redis:docker exec ecommerce-redis redis-cli ping"
-        "MinIO:curl -f http://localhost:9010/minio/health/live"
-        "Milvus:curl -f http://localhost:9091/healthz"
-        "ClickHouse:docker exec ecommerce-clickhouse clickhouse-client --query 'SELECT 1'"
-    )
+    # 啟動資料庫服務
+    echo -e "${YELLOW}🚀 啟動資料庫服務...${NC}"
     
-    local all_services_ok=true
-    
-    for service in "${services[@]}"; do
-        IFS=':' read -r name command <<< "$service"
-        if eval $command > /dev/null 2>&1; then
-            echo -e "${GREEN}✅ $name 服務正常${NC}"
+    if cd database-init && docker compose up -d; then
+        echo -e "${GREEN}✅ 資料庫服務啟動命令執行成功${NC}"
+        cd ..
+        
+        # 等待服務啟動
+        echo -e "${YELLOW}⏳ 等待資料庫服務完全啟動...${NC}"
+        sleep 30
+        
+        # 檢查各服務狀態
+        local services=(
+            "PostgreSQL:docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c 'SELECT 1;'"
+            "MongoDB:docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --eval 'db.runCommand(\"ping\")'"
+            "Redis:docker exec ecommerce-redis redis-cli -a redis_password ping"
+            "MinIO:curl -f http://localhost:9010/minio/health/live"
+            "Milvus:curl -f http://localhost:9091/healthz"
+            "ClickHouse:docker exec ecommerce-clickhouse clickhouse-client -u analytics_user --password analytics_password --query 'SELECT 1'"
+        )
+        
+        local all_services_ok=true
+        
+        for service in "${services[@]}"; do
+            IFS=':' read -r name command <<< "$service"
+            local max_attempts=10
+            local attempt=1
+            local service_ok=false
+            
+            while [ $attempt -le $max_attempts ]; do
+                if eval $command > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ $name 服務正常${NC}"
+                    service_ok=true
+                    break
+                fi
+                echo -e "${YELLOW}  $name 服務啟動中... (嘗試 $attempt/$max_attempts)${NC}"
+                sleep 10
+                attempt=$((attempt + 1))
+            done
+            
+            if [ "$service_ok" = false ]; then
+                echo -e "${RED}❌ $name 服務啟動失敗${NC}"
+                all_services_ok=false
+            fi
+        done
+        
+        if [ "$all_services_ok" = true ]; then
+            echo -e "${GREEN}✅ 所有資料庫服務正常運行${NC}"
+            COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
         else
-            echo -e "${RED}❌ $name 服務異常${NC}"
-            all_services_ok=false
+            echo -e "${RED}❌ 部分資料庫服務異常，但繼續執行...${NC}"
+            COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
         fi
-    done
-    
-    if [ "$all_services_ok" = true ]; then
-        echo -e "${GREEN}✅ 所有資料庫服務正常運行${NC}"
-        COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
     else
-        echo -e "${RED}❌ 部分資料庫服務異常${NC}"
+        echo -e "${RED}❌ 資料庫服務啟動失敗${NC}"
+        cd ..
         FAILED_STEPS=$((FAILED_STEPS + 1))
         return 1
     fi
@@ -260,7 +289,7 @@ initialize_databases() {
     
     # 執行 PostgreSQL 初始化
     echo -e "${YELLOW}  📊 初始化 PostgreSQL...${NC}"
-    if head -100 database-init/postgresql-init.sql | docker exec -i ecommerce-postgresql psql -U admin -d ecommerce_transactions > /dev/null 2>&1; then
+    if head -100 database-init/postgresql-init.sql | docker exec -i ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db > /dev/null 2>&1; then
         echo -e "${GREEN}    ✅ PostgreSQL 初始化成功${NC}"
     else
         echo -e "${RED}    ❌ PostgreSQL 初始化失敗${NC}"
@@ -268,7 +297,7 @@ initialize_databases() {
     
     # 執行 MongoDB 初始化
     echo -e "${YELLOW}  📊 初始化 MongoDB...${NC}"
-    if docker exec ecommerce-mongodb mongosh -u admin -p password123 --authenticationDatabase admin --file /dev/stdin < database-init/mongodb-init.js > /dev/null 2>&1; then
+    if docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --file /dev/stdin < database-init/mongodb-init.js > /dev/null 2>&1; then
         echo -e "${GREEN}    ✅ MongoDB 初始化成功${NC}"
     else
         echo -e "${RED}    ❌ MongoDB 初始化失敗${NC}"
@@ -288,7 +317,7 @@ initialize_databases() {
     
     # 執行 ClickHouse 初始化
     echo -e "${YELLOW}  📊 初始化 ClickHouse...${NC}"
-    if docker exec ecommerce-clickhouse clickhouse-client --multiquery < database-init/clickhouse-init.sql > /dev/null 2>&1; then
+    if docker exec ecommerce-clickhouse clickhouse-client -u analytics_user --password analytics_password --multiquery < database-init/clickhouse-init.sql > /dev/null 2>&1; then
         echo -e "${GREEN}    ✅ ClickHouse 初始化成功${NC}"
     else
         echo -e "${RED}    ❌ ClickHouse 初始化失敗${NC}"
@@ -326,9 +355,114 @@ generate_test_data() {
     COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
 }
 
-# 步驟7：驗證系統
+# 步驟7：啟動後端API服務
+start_backend_services() {
+    echo -e "${BLUE}📋 步驟 7/8: 啟動後端API服務${NC}"
+    echo "=============================="
+    
+    # 停止並清理現有的後端服務容器
+    echo -e "${YELLOW}🧹 清理現有的後端服務容器...${NC}"
+    docker stop ecommerce-api-node ecommerce-auth-service-test ecommerce-product-service-test ecommerce-order-service-test 2>/dev/null || true
+    docker rm ecommerce-api-node ecommerce-auth-service-test ecommerce-product-service-test ecommerce-order-service-test 2>/dev/null || true
+    
+    # 建構統一後端API服務鏡像
+    echo -e "${YELLOW}🔨 建構統一後端API服務鏡像...${NC}"
+    cd ecommerce-system
+    
+    if docker build -t ecommerce-api-node backend-node > /dev/null 2>&1; then
+        echo -e "${GREEN}    ✅ 後端API服務鏡像建構成功${NC}"
+    else
+        echo -e "${RED}    ❌ 後端API服務鏡像建構失敗，嘗試詳細建構...${NC}"
+        docker build -t ecommerce-api-node backend-node
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}    ❌ 後端API服務鏡像建構失敗${NC}"
+            cd ..
+            FAILED_STEPS=$((FAILED_STEPS + 1))
+            return 1
+        fi
+    fi
+    
+    cd ..
+    
+    # 啟動統一後端API服務
+    echo -e "${YELLOW}🚀 啟動統一後端API服務...${NC}"
+    
+    docker run -d --name ecommerce-api-node --network host \
+        -e NODE_ENV=production \
+        -e PORT=3002 \
+        -e POSTGRES_HOST=localhost \
+        -e POSTGRES_PORT=5433 \
+        -e POSTGRES_DB=ecommerce_db \
+        -e POSTGRES_USER=ecommerce_user \
+        -e POSTGRES_PASSWORD=ecommerce_password \
+        -e MONGODB_URI=mongodb://root:mongodb_password@localhost:27018/ecommerce?authSource=admin \
+        -e REDIS_URL=redis://:redis_password@localhost:6380 \
+        -e CLICKHOUSE_URL=http://localhost:8124 \
+        -e CLICKHOUSE_USER=analytics_user \
+        -e CLICKHOUSE_PASSWORD=analytics_password \
+        -e JWT_SECRET=your-super-secret-jwt-key-for-development \
+        -e JWT_EXPIRES_IN=24h \
+        -e CORS_ORIGIN=http://localhost:3000,http://localhost:3007,http://localhost:8080 \
+        ecommerce-api-node
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}    ✅ 統一後端API服務啟動成功${NC}"
+    else
+        echo -e "${RED}    ❌ 統一後端API服務啟動失敗${NC}"
+        FAILED_STEPS=$((FAILED_STEPS + 1))
+        return 1
+    fi
+    
+    # 等待服務啟動
+    echo -e "${YELLOW}⏳ 等待後端服務完全啟動...${NC}"
+    sleep 15
+    
+    # 檢查API服務
+    local api_services=(
+        "統一API服務:curl -f http://localhost:3002/health"
+        "認證API:curl -f http://localhost:3002/api/v1"
+        "商品API:curl -f http://localhost:3002/api/v1/products"
+        "用戶API:curl -f http://localhost:3002/api/v1/users"
+    )
+    
+    local services_started=0
+    
+    for service in "${api_services[@]}"; do
+        IFS=':' read -r name command <<< "$service"
+        local max_attempts=6
+        local attempt=1
+        local service_ok=false
+        
+        while [ $attempt -le $max_attempts ]; do
+            if eval $command > /dev/null 2>&1; then
+                echo -e "${GREEN}    ✅ $name 正常運行${NC}"
+                service_ok=true
+                services_started=$((services_started + 1))
+                break
+            fi
+            echo -e "${YELLOW}    $name 啟動中... (嘗試 $attempt/$max_attempts)${NC}"
+            sleep 5
+            attempt=$((attempt + 1))
+        done
+        
+        if [ "$service_ok" = false ]; then
+            echo -e "${YELLOW}    ⚠️  $name 可能需要更多時間啟動${NC}"
+        fi
+    done
+    
+    if [ $services_started -gt 0 ]; then
+        echo -e "${GREEN}✅ 統一後端API服務成功啟動，包含 $services_started 個API端點${NC}"
+        COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
+    else
+        echo -e "${RED}❌ 統一後端API服務啟動失敗${NC}"
+        FAILED_STEPS=$((FAILED_STEPS + 1))
+        return 1
+    fi
+}
+
+# 步驟8：驗證系統
 verify_system() {
-    echo -e "${BLUE}📋 步驟 7/7: 驗證系統${NC}"
+    echo -e "${BLUE}📋 步驟 8/8: 驗證系統${NC}"
     echo "=============================="
     
     # 執行驗證腳本
@@ -358,12 +492,12 @@ show_system_status() {
     
     # 顯示資料庫連線資訊
     echo -e "\n${CYAN}🔗 資料庫連線資訊:${NC}"
-    echo "PostgreSQL: localhost:5432 (用戶: ecommerce_user, 密碼: ecommerce_password)"
-    echo "MongoDB: localhost:27017 (用戶: ecommerce_user, 密碼: ecommerce_password)"
-    echo "Redis: localhost:6379 (密碼: redis_password)"
-    echo "MinIO: localhost:9000 (用戶: minioadmin, 密碼: minioadmin123)"
-    echo "Milvus: localhost:19530 (用戶: root, 密碼: Milvus)"
-    echo "ClickHouse: localhost:8123 (用戶: default, 密碼: clickhouse_password)"
+    echo "PostgreSQL: localhost:5433 (用戶: ecommerce_user, 密碼: ecommerce_password)"
+    echo "MongoDB: localhost:27018 (用戶: root, 密碼: mongodb_password)"
+    echo "Redis: localhost:6380 (密碼: redis_password)"
+    echo "MinIO: localhost:9010 (用戶: minioadmin, 密碼: minioadmin123)"
+    echo "Milvus: localhost:19531 (用戶: root, 密碼: Milvus)"
+    echo "ClickHouse: localhost:8124 (用戶: analytics_user, 密碼: analytics_password)"
     
     # 顯示測試資料統計
     echo -e "\n${CYAN}📈 測試資料統計:${NC}"
@@ -390,10 +524,11 @@ main() {
     echo "  1. 環境檢查"
     echo "  2. 安裝依賴"
     echo "  3. 清理現有數據"
-    echo "  4. 檢查資料庫服務"
+    echo "  4. 啟動資料庫服務"
     echo "  5. 初始化資料庫"
     echo "  6. 生成測試資料"
-    echo "  7. 驗證系統"
+    echo "  7. 啟動後端API服務"
+    echo "  8. 驗證系統"
     echo ""
     
     # 檢查是否為自動模式
@@ -413,9 +548,10 @@ main() {
     check_environment || exit 1
     install_dependencies || exit 1
     clean_existing_data || exit 1
-    check_database_services || exit 1
+    start_database_services || exit 1
     initialize_databases || exit 1
     generate_test_data || exit 1
+    start_backend_services || exit 1
     verify_system || exit 1
     
     # 清理
@@ -437,15 +573,40 @@ main() {
         show_system_status
         
         echo -e "\n${CYAN}🚀 下一步操作:${NC}"
-        echo "1. 查看服務狀態: docker-compose ps"
-        echo "2. 查看服務日誌: docker-compose logs [service_name]"
+        echo "1. 查看服務狀態: docker compose ps"
+        echo "2. 查看服務日誌: docker compose logs [service_name]"
         echo "3. 連接到資料庫進行開發"
         echo "4. 查看測試資料: 參考 test-data/README.md"
+        echo "5. 啟動前端: cd ecommerce-system/frontend && npm run dev"
+        
+        echo -e "\n${CYAN}🔗 統一後端API服務端點:${NC}"
+        echo "🌐 主要API服務: http://localhost:3002"
+        echo "   健康檢查: http://localhost:3002/health"
+        echo "   API文檔: http://localhost:3002/api-docs"
+        echo ""
+        echo "🔐 認證API: http://localhost:3002/api/v1/auth"
+        echo "👥 用戶API: http://localhost:3002/api/v1/users"
+        echo "📦 商品API: http://localhost:3002/api/v1/products"
+        echo "📋 訂單API: http://localhost:3002/api/v1/orders"
+        echo "🛒 購物車API: http://localhost:3002/api/v1/cart"
+        echo "📊 儀表板API: http://localhost:3002/api/v1/dashboard"
+        echo "🏷️ 分類API: http://localhost:3002/api/v1/categories"
+        echo "📦 庫存API: http://localhost:3002/api/v1/inventory"
+        echo ""
+        echo -e "${CYAN}🔗 管理界面:${NC}"
+        echo "📊 PostgreSQL Admin: http://localhost:5050"
+        echo "📊 MongoDB Express: http://localhost:8081"
+        echo "📊 Redis Commander: http://localhost:8082"
+        echo "📊 MinIO Console: http://localhost:9011"
+        echo ""
+        echo -e "${CYAN}🖥️ 前端應用:${NC}"
+        echo "前端應用: http://localhost:3000 (需要手動啟動)"
         
         echo -e "\n${YELLOW}💡 提示:${NC}"
-        echo "- 所有服務都已啟動並準備就緒"
-        echo "- 測試資料已生成並驗證通過"
+        echo "- 所有後端服務都已啟動並準備就緒"
+        echo "- 資料庫已初始化並包含測試資料"
         echo "- 可以開始進行電商系統開發"
+        echo "- 重開機後只需執行: ./one-click-setup.sh --auto"
         
         exit 0
     else
@@ -454,7 +615,7 @@ main() {
         echo "1. 檢查 Docker 服務是否正常運行"
         echo "2. 檢查網路連線和埠號是否被占用"
         echo "3. 檢查系統資源（記憶體、磁碟空間）"
-        echo "4. 查看詳細錯誤日誌: docker-compose logs"
+        echo "4. 查看詳細錯誤日誌: docker compose logs"
         
         exit 1
     fi

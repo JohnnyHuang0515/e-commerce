@@ -21,7 +21,7 @@ FAILED_DATABASES=0
 generate_postgresql_data() {
     echo -e "${BLUE}📊 生成 PostgreSQL 測試資料...${NC}"
     
-    if docker exec ecommerce-postgresql psql -U admin -d ecommerce_transactions -c "
+    if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "
 INSERT INTO users (name, email, password_hash, phone, status) VALUES 
 ('測試用戶1', 'test1@example.com', 'hash1', '0911111111', 'active'),
 ('測試用戶2', 'test2@example.com', 'hash2', '0922222222', 'active'),
@@ -39,7 +39,7 @@ INSERT INTO users (name, email, password_hash, phone, status) VALUES
 generate_mongodb_data() {
     echo -e "${BLUE}📊 生成 MongoDB 測試資料...${NC}"
     
-    if docker exec ecommerce-mongodb mongosh -u admin -p password123 --authenticationDatabase admin --eval "
+    if docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --eval "
 db = db.getSiblingDB('ecommerce');
 db.products_detail.insertOne({
   product_pg_id: 999,
@@ -65,12 +65,12 @@ print('MongoDB 測試資料插入完成！');
 generate_redis_data() {
     echo -e "${BLUE}📊 生成 Redis 測試資料...${NC}"
     
-    if docker exec ecommerce-redis redis-cli SET test:key "test_value" > /dev/null 2>&1 && \
-       docker exec ecommerce-redis redis-cli SET test:session "test_session_data" > /dev/null 2>&1 && \
-       docker exec ecommerce-redis redis-cli SET test:cart "test_cart_data" > /dev/null 2>&1 && \
-       docker exec ecommerce-redis redis-cli EXPIRE test:key 3600 > /dev/null 2>&1 && \
-       docker exec ecommerce-redis redis-cli EXPIRE test:session 86400 > /dev/null 2>&1 && \
-       docker exec ecommerce-redis redis-cli EXPIRE test:cart 604800 > /dev/null 2>&1; then
+    if docker exec ecommerce-redis redis-cli -a redis_password SET test:key "test_value" > /dev/null 2>&1 && \
+       docker exec ecommerce-redis redis-cli -a redis_password SET test:session "test_session_data" > /dev/null 2>&1 && \
+       docker exec ecommerce-redis redis-cli -a redis_password SET test:cart "test_cart_data" > /dev/null 2>&1 && \
+       docker exec ecommerce-redis redis-cli -a redis_password EXPIRE test:key 3600 > /dev/null 2>&1 && \
+       docker exec ecommerce-redis redis-cli -a redis_password EXPIRE test:session 86400 > /dev/null 2>&1 && \
+       docker exec ecommerce-redis redis-cli -a redis_password EXPIRE test:cart 604800 > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Redis 測試資料生成成功${NC}"
         COMPLETED_DATABASES=$((COMPLETED_DATABASES + 1))
     else
@@ -134,7 +134,7 @@ main() {
     echo -e "${YELLOW}🔍 檢查容器狀態...${NC}"
     
     # 檢查容器是否運行
-    local containers=("ecommerce-postgresql" "ecommerce-mongodb" "ecommerce-redis" "ecommerce-minio-files" "milvus-standalone" "ecommerce-clickhouse")
+    local containers=("ecommerce-postgresql" "ecommerce-mongodb" "ecommerce-redis" "ecommerce-minio-files" "ecommerce-milvus-standalone" "ecommerce-clickhouse")
     local running_containers=0
     
     for container in "${containers[@]}"; do

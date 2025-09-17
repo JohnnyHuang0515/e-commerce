@@ -49,11 +49,11 @@ validate_postgresql() {
     echo -e "${BLUE}📊 驗證 PostgreSQL 測試資料...${NC}"
     
     # 檢查用戶數量
-    user_count=$(docker exec ecommerce-postgresql psql -U admin -d ecommerce_transactions -t -c 'SELECT COUNT(*) FROM users;' 2>/dev/null | tr -d ' \n')
+    user_count=$(docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -t -c 'SELECT COUNT(*) FROM users;' 2>/dev/null | tr -d ' \n')
     check_result "PostgreSQL 用戶數量" "$user_count" "3"
     
     # 檢查資料庫連線
-    if docker exec ecommerce-postgresql psql -U admin -d ecommerce_transactions -c "SELECT 1;" > /dev/null 2>&1; then
+    if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "SELECT 1;" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ PostgreSQL 連線正常${NC}"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
@@ -68,11 +68,11 @@ validate_mongodb() {
     echo -e "${BLUE}📊 驗證 MongoDB 測試資料...${NC}"
     
     # 檢查商品詳情數量
-    product_detail_count=$(docker exec ecommerce-mongodb mongosh -u admin -p password123 --authenticationDatabase admin --quiet --eval "db = db.getSiblingDB('ecommerce'); db.products_detail.countDocuments()" 2>/dev/null | tr -d ' \n')
+    product_detail_count=$(docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --quiet --eval "db = db.getSiblingDB('ecommerce'); db.products_detail.countDocuments()" 2>/dev/null | tr -d ' \n')
     check_result "MongoDB 商品詳情數量" "$product_detail_count" ">=1"
     
     # 檢查資料庫連線
-    if docker exec ecommerce-mongodb mongosh -u admin -p password123 --authenticationDatabase admin --eval "db.runCommand('ping')" > /dev/null 2>&1; then
+    if docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --eval "db.runCommand('ping')" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ MongoDB 連線正常${NC}"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
@@ -87,7 +87,7 @@ validate_redis() {
     echo -e "${BLUE}📊 驗證 Redis 測試資料...${NC}"
     
     # 檢查總鍵值數量
-    total_keys=$(docker exec ecommerce-redis redis-cli DBSIZE 2>/dev/null | tr -d ' \n')
+    total_keys=$(docker exec ecommerce-redis redis-cli -a redis_password DBSIZE 2>/dev/null | tr -d ' \n')
     if [ "$total_keys" -gt "0" ]; then
         echo -e "${GREEN}✅ Redis 總鍵值數量: 通過 (>0)${NC}"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
@@ -98,11 +98,11 @@ validate_redis() {
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     
     # 檢查測試鍵值
-    test_value=$(docker exec ecommerce-redis redis-cli GET "test:key" 2>/dev/null | tr -d ' \n')
+    test_value=$(docker exec ecommerce-redis redis-cli -a redis_password GET "test:key" 2>/dev/null | tr -d ' \n')
     check_result "Redis 測試鍵值" "$test_value" "test_value"
     
     # 檢查資料庫連線
-    if docker exec ecommerce-redis redis-cli ping > /dev/null 2>&1; then
+    if docker exec ecommerce-redis redis-cli -a redis_password ping > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Redis 連線正常${NC}"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
@@ -176,7 +176,7 @@ check_services() {
     echo -e "${BLUE}🔍 檢查服務連線...${NC}"
     
     # 檢查 PostgreSQL
-    if docker exec ecommerce-postgresql psql -U admin -d ecommerce_transactions -c "SELECT 1;" > /dev/null 2>&1; then
+    if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "SELECT 1;" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ PostgreSQL 連線正常${NC}"
     else
         echo -e "${RED}❌ PostgreSQL 連線失敗${NC}"
@@ -184,7 +184,7 @@ check_services() {
     fi
     
     # 檢查 MongoDB
-    if docker exec ecommerce-mongodb mongosh -u admin -p password123 --authenticationDatabase admin --eval "db.runCommand('ping')" > /dev/null 2>&1; then
+    if docker exec ecommerce-mongodb mongosh -u root -p mongodb_password --authenticationDatabase admin --eval "db.runCommand('ping')" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ MongoDB 連線正常${NC}"
     else
         echo -e "${RED}❌ MongoDB 連線失敗${NC}"
@@ -192,7 +192,7 @@ check_services() {
     fi
     
     # 檢查 Redis
-    if docker exec ecommerce-redis redis-cli ping > /dev/null 2>&1; then
+    if docker exec ecommerce-redis redis-cli -a redis_password ping > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Redis 連線正常${NC}"
     else
         echo -e "${RED}❌ Redis 連線失敗${NC}"
