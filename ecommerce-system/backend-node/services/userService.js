@@ -7,9 +7,16 @@ const getUserByPublicId = async (publicId) => {
 
   try {
     const result = await postgresPool.query(
-      `SELECT id, public_id, name, email, status, created_at, updated_at
+      `SELECT 
+         id AS user_id,
+         id::text AS public_id,
+         name,
+         email,
+         status,
+         created_at,
+         updated_at
        FROM users
-       WHERE public_id = $1`,
+       WHERE id::text = $1`,
       [publicId]
     );
 

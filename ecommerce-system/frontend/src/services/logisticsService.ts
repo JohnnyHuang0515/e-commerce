@@ -50,6 +50,29 @@ export interface LogisticsStats {
   failed: number;
 }
 
+export interface CreateShipmentRequest {
+  orderId: string;
+  status?: ShipmentStatus;
+  provider?: string;
+  method?: string;
+  trackingNumber?: string;
+  destination?: Partial<ShipmentRecord['destination']>;
+  estimatedDelivery?: string;
+}
+
+export interface UpdateShipmentRequest {
+  status?: ShipmentStatus;
+  provider?: string | null;
+  method?: string | null;
+  trackingNumber?: string | null;
+  destination?: Partial<Record<keyof ShipmentRecord['destination'], string | null>> | null;
+  estimatedDelivery?: string | null;
+}
+
+export interface DeleteShipmentResponse {
+  success: boolean;
+}
+
 const isAxiosError = (error: unknown): error is AxiosError =>
   typeof error === 'object' && error !== null && 'isAxiosError' in error;
 
@@ -156,12 +179,28 @@ const buildMockStats = (shipments: ShipmentRecord[]): LogisticsStats => {
   );
 };
 
+const normalizeShipmentResponse = (shipment: ShipmentRecord): ShipmentRecord => ({
+  ...shipment,
+  destination: {
+    name: shipment.destination?.name ?? '',
+    city: shipment.destination?.city ?? '',
+    district: shipment.destination?.district ?? '',
+    address: shipment.destination?.address ?? '',
+  },
+});
+
 export class LogisticsService {
   static async getShipments(params: LogisticsListParams = {}): Promise<ApiResponse<LogisticsListResponse>> {
     try {
       const response = await logisticsApi.get('/v1/shipments', { params });
       if (response.data?.success) {
-        return response.data;
+        return {
+          ...response.data,
+          data: {
+            ...response.data.data,
+            items: response.data.data.items.map(normalizeShipmentResponse),
+          },
+        };
       }
     } catch (error) {
       if (!isAxiosError(error)) {
@@ -193,16 +232,46 @@ export class LogisticsService {
     };
   }
 
-  static async createShipment(): Promise<never> {
-    return Promise.reject(new Error('物流建立尚未在前端支援。'));
+  static async getShipment(shipmentId: string): Promise<ApiResponse<ShipmentRecord>> {
+    const response = await logisticsApi.get(`/v1/shipments/${shipmentId}`);
+    if (response.data?.success) {
+      return {
+        ...response.data,
+        data: normalizeShipmentResponse(response.data.data),
+      };
+    }
+    return response.data;
   }
 
-  static async updateShipment(): Promise<never> {
-    return Promise.reject(new Error('物流更新尚未在前端支援。'));
+  static async createShipment(payload: CreateShipmentRequest): Promise<ApiResponse<ShipmentRecord>> {
+    const response = await logisticsApi.post('/v1/shipments', payload);
+
+    if (response.data?.success) {
+      return {
+        ...response.data,
+        data: normalizeShipmentResponse(response.data.data),
+      };
+    }
+
+    return response.data;
   }
 
-  static async deleteShipment(): Promise<never> {
-    return Promise.reject(new Error('物流刪除尚未在前端支援。'));
+  static async updateShipment(shipmentId: string, payload: UpdateShipmentRequest): Promise<ApiResponse<ShipmentRecord>> {
+    const response = await logisticsApi.put(`/v1/shipments/${shipmentId}`, payload);
+
+    if (response.data?.success) {
+      return {
+        ...response.data,
+        data: normalizeShipmentResponse(response.data.data),
+      };
+    }
+
+    return response.data;
+  }
+
+  static async deleteShipment(shipmentId: string): Promise<DeleteShipmentResponse> {
+    const response = await logisticsApi.delete(`/v1/shipments/${shipmentId}`);
+    return response.data;
   }
 }
 

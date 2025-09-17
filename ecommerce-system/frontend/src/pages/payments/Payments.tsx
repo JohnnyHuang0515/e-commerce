@@ -1,12 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
-import { DollarOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { DollarOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 
 import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import {
   usePayments,
   usePaymentStats,
+  useCreatePayment,
+  useUpdatePayment,
+  useDeletePayment,
   type PaymentListParams,
 } from '../../hooks/usePayments';
 import type { PaymentRecord, PaymentStatus, PaymentMethod } from '../../services/paymentService';
@@ -19,6 +22,16 @@ interface PaymentFilterForm {
   userId?: string;
   status?: PaymentStatus;
   method?: PaymentMethod;
+}
+
+interface PaymentFormValues {
+  orderId: string;
+  amount: number;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  currency: string;
+  provider?: string;
+  transactionId?: string;
 }
 
 const statusConfig: Record<PaymentStatus, { color: string; text: string }> = {
@@ -42,9 +55,16 @@ const Payments: React.FC = () => {
   const [filters, setFilters] = useState<PaymentListParams>({ page: 1, limit: 10 });
   const [filterForm] = Form.useForm<PaymentFilterForm>();
   const [viewingPayment, setViewingPayment] = useState<PaymentRecord | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createForm] = Form.useForm<PaymentFormValues>();
+  const [editForm] = Form.useForm<PaymentFormValues>();
+  const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
 
   const { data: paymentsResponse, isLoading, refetch } = usePayments(filters);
   const { data: statsResponse } = usePaymentStats();
+  const createPaymentMutation = useCreatePayment();
+  const updatePaymentMutation = useUpdatePayment();
+  const deletePaymentMutation = useDeletePayment();
 
   const payments = paymentsResponse?.data.items ?? [];
   const pagination = paymentsResponse?.data;
@@ -112,9 +132,46 @@ const Payments: React.FC = () => {
         key: 'actions',
         width: 100,
         render: (_, record) => (
-          <Button type="link" onClick={() => setViewingPayment(record)}>
-            查看
-          </Button>
+          <Space>
+            <Button type="link" onClick={() => setViewingPayment(record)}>
+              查看
+            </Button>
+            <Button
+              type="link"
+              onClick={() => {
+                setEditingPayment(record);
+                editForm.setFieldsValue({
+                  orderId: record.orderId,
+                  amount: Number((record.amount ?? 0) / 100),
+                  method: record.method,
+                  status: record.status,
+                  currency: record.currency,
+                  provider: record.provider,
+                  transactionId: record.transactionId,
+                });
+              }}
+            >
+              編輯
+            </Button>
+            <Popconfirm
+              title="確定要刪除此支付紀錄嗎？"
+              okText="刪除"
+              cancelText="取消"
+              okButtonProps={{ danger: true, loading: deletePaymentMutation.isPending }}
+              onConfirm={async () => {
+                try {
+                  await deletePaymentMutation.mutateAsync(record.id);
+                  message.success('支付紀錄已刪除');
+                  refetch();
+                } catch (error) {
+                  const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || '刪除失敗';
+                  message.error(errorMessage);
+                }
+              }}
+            >
+              <Button type="link" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          </Space>
         ),
       },
     ],
@@ -167,6 +224,55 @@ const Payments: React.FC = () => {
     }));
   }
 
+  async function handleCreateSubmit(values: PaymentFormValues) {
+    try {
+      await createPaymentMutation.mutateAsync({
+        orderId: values.orderId.trim(),
+        amount: Math.round(Number(values.amount) * 100),
+        method: values.method,
+        status: values.status,
+        currency: values.currency,
+        provider: values.provider?.trim() || undefined,
+        transactionId: values.transactionId?.trim() || undefined,
+      });
+      message.success('新增支付紀錄成功');
+      setIsCreateModalOpen(false);
+      createForm.resetFields();
+      refetch();
+    } catch (error) {
+      const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || '新增失敗';
+      message.error(errorMessage);
+    }
+  }
+
+  async function handleEditSubmit(values: PaymentFormValues) {
+    if (!editingPayment) {
+      return;
+    }
+
+    try {
+      await updatePaymentMutation.mutateAsync({
+        paymentId: editingPayment.id,
+        payload: {
+          amount: Math.round(Number(values.amount) * 100),
+          method: values.method,
+          status: values.status,
+          currency: values.currency,
+          provider: values.provider?.trim() || null,
+          transactionId: values.transactionId?.trim() || null,
+        },
+      });
+
+      message.success('更新支付紀錄成功');
+      setEditingPayment(null);
+      editForm.resetFields();
+      refetch();
+    } catch (error) {
+      const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || '更新失敗';
+      message.error(errorMessage);
+    }
+  }
+
   return (
     <UnifiedPageLayout
       title="支付紀錄"
@@ -175,6 +281,9 @@ const Payments: React.FC = () => {
       loading={isLoading}
       extra={
         <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>
+            新增支付
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
             重新整理
           </Button>
@@ -296,6 +405,130 @@ const Payments: React.FC = () => {
             </div>
           </Space>
         )}
+      </Modal>
+
+      <Modal
+        open={isCreateModalOpen}
+        title="新增支付紀錄"
+        onCancel={() => {
+          setIsCreateModalOpen(false);
+          createForm.resetFields();
+        }}
+        onOk={() => createForm.submit()}
+        confirmLoading={createPaymentMutation.isPending}
+      >
+        <Form<PaymentFormValues>
+          layout="vertical"
+          form={createForm}
+          onFinish={handleCreateSubmit}
+          initialValues={{
+            currency: 'TWD',
+            status: 'pending',
+            method: 'credit_card',
+          }}
+        >
+          <Form.Item
+            name="orderId"
+            label="訂單 ID"
+            rules={[{ required: true, message: '請輸入訂單 ID' }]}
+          >
+            <Input placeholder="請輸入訂單公開 ID" allowClear />
+          </Form.Item>
+          <Form.Item
+            name="amount"
+            label="金額"
+            rules={[{ required: true, message: '請輸入金額' }]}
+          >
+            <InputNumber
+              min={0.01}
+              step={0.01}
+              addonAfter="TWD"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item name="currency" label="幣別" rules={[{ required: true }]}>
+            <Input placeholder="如 TWD" maxLength={3} />
+          </Form.Item>
+          <Form.Item name="method" label="支付方式" rules={[{ required: true }]}>
+            <Select>
+              {Object.entries(methodLabels).map(([value, label]) => (
+                <Option key={value} value={value}>
+                  {label}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="status" label="狀態" rules={[{ required: true }]}>
+            <Select>
+              {Object.entries(statusConfig).map(([value, config]) => (
+                <Option key={value} value={value}>
+                  {config.text}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="provider" label="支付平台">
+            <Input placeholder="如 Stripe" allowClear />
+          </Form.Item>
+          <Form.Item name="transactionId" label="交易序號">
+            <Input placeholder="選填" allowClear />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(editingPayment)}
+        title="編輯支付紀錄"
+        onCancel={() => {
+          setEditingPayment(null);
+          editForm.resetFields();
+        }}
+        onOk={() => editForm.submit()}
+        confirmLoading={updatePaymentMutation.isPending}
+      >
+        <Form<PaymentFormValues>
+          layout="vertical"
+          form={editForm}
+          onFinish={handleEditSubmit}
+        >
+          <Form.Item label="訂單 ID" name="orderId">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item
+            name="amount"
+            label="金額"
+            rules={[{ required: true, message: '請輸入金額' }]}
+          >
+            <InputNumber min={0.01} step={0.01} addonAfter="TWD" style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="currency" label="幣別" rules={[{ required: true }]}>
+            <Input placeholder="如 TWD" maxLength={3} />
+          </Form.Item>
+          <Form.Item name="method" label="支付方式" rules={[{ required: true }]}>
+            <Select>
+              {Object.entries(methodLabels).map(([value, label]) => (
+                <Option key={value} value={value}>
+                  {label}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="status" label="狀態" rules={[{ required: true }]}>
+            <Select>
+              {Object.entries(statusConfig).map(([value, config]) => (
+                <Option key={value} value={value}>
+                  {config.text}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="provider" label="支付平台">
+            <Input placeholder="如 Stripe" allowClear />
+          </Form.Item>
+          <Form.Item name="transactionId" label="交易序號">
+            <Input placeholder="選填" allowClear />
+          </Form.Item>
+        </Form>
       </Modal>
     </UnifiedPageLayout>
   );

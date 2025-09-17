@@ -1,12 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Card, Form, Modal, Select, Space, Table, Tag, Typography } from 'antd';
-import { EnvironmentOutlined, ReloadOutlined, SearchOutlined, TruckOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
+import {
+  Button,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from 'antd';
+import { DeleteOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TruckOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 
 import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import {
   useShipments,
   useLogisticsStats,
+  useCreateShipment,
+  useUpdateShipment,
+  useDeleteShipment,
   type LogisticsListParams,
 } from '../../hooks/useLogistics';
 import type { ShipmentRecord, ShipmentStatus } from '../../services/logisticsService';
@@ -18,6 +36,19 @@ interface LogisticsFilterForm {
   status?: ShipmentStatus;
   provider?: string;
   method?: string;
+}
+
+interface ShipmentFormValues {
+  orderId: string;
+  status: ShipmentStatus;
+  provider?: string;
+  method?: string;
+  trackingNumber?: string;
+  destinationName?: string;
+  destinationCity?: string;
+  destinationDistrict?: string;
+  destinationAddress?: string;
+  estimatedDelivery?: dayjs.Dayjs;
 }
 
 const statusLabels: Record<ShipmentStatus, { text: string; color: string }> = {
@@ -35,9 +66,16 @@ const Logistics: React.FC = () => {
   const [filters, setFilters] = useState<LogisticsListParams>({ page: 1, limit: 10 });
   const [filterForm] = Form.useForm<LogisticsFilterForm>();
   const [viewingShipment, setViewingShipment] = useState<ShipmentRecord | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createForm] = Form.useForm<ShipmentFormValues>();
+  const [editForm] = Form.useForm<ShipmentFormValues>();
+  const [editingShipment, setEditingShipment] = useState<ShipmentRecord | null>(null);
 
   const { data: shipmentsResponse, isLoading, refetch } = useShipments(filters);
   const { data: statsResponse } = useLogisticsStats();
+  const createShipmentMutation = useCreateShipment();
+  const updateShipmentMutation = useUpdateShipment();
+  const deleteShipmentMutation = useDeleteShipment();
 
   const shipments = shipmentsResponse?.data.items ?? [];
   const pagination = shipmentsResponse?.data;
@@ -112,9 +150,49 @@ const Logistics: React.FC = () => {
         key: 'actions',
         width: 100,
         render: (_, record) => (
-          <Button type="link" onClick={() => setViewingShipment(record)}>
-            查看
-          </Button>
+          <Space>
+            <Button type="link" onClick={() => setViewingShipment(record)}>
+              查看
+            </Button>
+            <Button
+              type="link"
+              onClick={() => {
+                setEditingShipment(record);
+                editForm.setFieldsValue({
+                  orderId: record.orderId,
+                  status: record.status,
+                  provider: record.provider,
+                  method: record.method,
+                  trackingNumber: record.trackingNumber,
+                  destinationName: record.destination?.name,
+                  destinationCity: record.destination?.city,
+                  destinationDistrict: record.destination?.district,
+                  destinationAddress: record.destination?.address,
+                  estimatedDelivery: record.estimatedDelivery ? dayjs(record.estimatedDelivery) : undefined,
+                });
+              }}
+            >
+              編輯
+            </Button>
+            <Popconfirm
+              title="確定要刪除此物流紀錄嗎？"
+              okText="刪除"
+              cancelText="取消"
+              okButtonProps={{ danger: true, loading: deleteShipmentMutation.isPending }}
+              onConfirm={async () => {
+                try {
+                  await deleteShipmentMutation.mutateAsync(record.id);
+                  message.success('物流紀錄已刪除');
+                  refetch();
+                } catch (error) {
+                  const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || '刪除失敗';
+                  message.error(errorMessage);
+                }
+              }}
+            >
+              <Button type="link" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          </Space>
         ),
       },
     ],
@@ -166,6 +244,89 @@ const Logistics: React.FC = () => {
     }));
   }
 
+  function normalizeDestination(values: ShipmentFormValues, mode: 'create' | 'update') {
+    const formatValue = (input?: string) => {
+      const trimmed = input?.trim();
+      if (!trimmed) {
+        return mode === 'update' ? null : undefined;
+      }
+      return trimmed;
+    };
+
+    const destination = {
+      name: formatValue(values.destinationName),
+      city: formatValue(values.destinationCity),
+      district: formatValue(values.destinationDistrict),
+      address: formatValue(values.destinationAddress),
+    };
+
+    const hasValue = Object.values(destination).some((value) => value && value !== null);
+
+    if (!hasValue && mode === 'create') {
+      return undefined;
+    }
+
+    if (!hasValue && mode === 'update') {
+      return {
+        name: null,
+        city: null,
+        district: null,
+        address: null,
+      };
+    }
+
+    return destination;
+  }
+
+  async function handleCreateSubmit(values: ShipmentFormValues) {
+    try {
+      await createShipmentMutation.mutateAsync({
+        orderId: values.orderId.trim(),
+        status: values.status,
+        provider: values.provider?.trim() || undefined,
+        method: values.method?.trim() || undefined,
+        trackingNumber: values.trackingNumber?.trim() || undefined,
+        destination: normalizeDestination(values, 'create'),
+        estimatedDelivery: values.estimatedDelivery?.toISOString(),
+      });
+      message.success('新增物流紀錄成功');
+      setIsCreateModalOpen(false);
+      createForm.resetFields();
+      refetch();
+    } catch (error) {
+      const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || '新增失敗';
+      message.error(errorMessage);
+    }
+  }
+
+  async function handleEditSubmit(values: ShipmentFormValues) {
+    if (!editingShipment) {
+      return;
+    }
+
+    try {
+      await updateShipmentMutation.mutateAsync({
+        shipmentId: editingShipment.id,
+        payload: {
+          status: values.status,
+          provider: values.provider?.trim() || null,
+          method: values.method?.trim() || null,
+          trackingNumber: values.trackingNumber?.trim() || null,
+          destination: normalizeDestination(values, 'update'),
+          estimatedDelivery: values.estimatedDelivery ? values.estimatedDelivery.toISOString() : null,
+        },
+      });
+
+      message.success('更新物流紀錄成功');
+      setEditingShipment(null);
+      editForm.resetFields();
+      refetch();
+    } catch (error) {
+      const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || '更新失敗';
+      message.error(errorMessage);
+    }
+  }
+
   return (
     <UnifiedPageLayout
       title="物流配送"
@@ -174,6 +335,9 @@ const Logistics: React.FC = () => {
       loading={isLoading}
       extra={
         <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>
+            新增物流
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
             重新整理
           </Button>
@@ -300,6 +464,113 @@ const Logistics: React.FC = () => {
             </div>
           </Space>
         )}
+      </Modal>
+
+      <Modal
+        open={isCreateModalOpen}
+        title="新增物流紀錄"
+        onCancel={() => {
+          setIsCreateModalOpen(false);
+          createForm.resetFields();
+        }}
+        onOk={() => createForm.submit()}
+        confirmLoading={createShipmentMutation.isPending}
+      >
+        <Form<ShipmentFormValues>
+          layout="vertical"
+          form={createForm}
+          onFinish={handleCreateSubmit}
+          initialValues={{
+            status: 'pending',
+          }}
+        >
+          <Form.Item name="orderId" label="訂單 ID" rules={[{ required: true, message: '請輸入訂單 ID' }]}>
+            <Input placeholder="請輸入訂單公開 ID" allowClear />
+          </Form.Item>
+          <Form.Item name="status" label="狀態" rules={[{ required: true, message: '請選擇狀態' }]}>
+            <Select>
+              {Object.entries(statusLabels).map(([value, config]) => (
+                <Option key={value} value={value}>
+                  {config.text}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="provider" label="物流商">
+            <Input placeholder="如 黑貓宅急便" allowClear />
+          </Form.Item>
+          <Form.Item name="method" label="配送方式">
+            <Input placeholder="如 宅配" allowClear />
+          </Form.Item>
+          <Form.Item name="trackingNumber" label="追蹤編號">
+            <Input placeholder="選填" allowClear />
+          </Form.Item>
+          <Form.Item name="destinationName" label="收件人">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationCity" label="城市">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationDistrict" label="行政區">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationAddress" label="地址">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="estimatedDelivery" label="預計送達">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(editingShipment)}
+        title="編輯物流紀錄"
+        onCancel={() => {
+          setEditingShipment(null);
+          editForm.resetFields();
+        }}
+        onOk={() => editForm.submit()}
+        confirmLoading={updateShipmentMutation.isPending}
+      >
+        <Form<ShipmentFormValues> layout="vertical" form={editForm} onFinish={handleEditSubmit}>
+          <Form.Item name="orderId" label="訂單 ID">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item name="status" label="狀態" rules={[{ required: true, message: '請選擇狀態' }]}>
+            <Select>
+              {Object.entries(statusLabels).map(([value, config]) => (
+                <Option key={value} value={value}>
+                  {config.text}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="provider" label="物流商">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="method" label="配送方式">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="trackingNumber" label="追蹤編號">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationName" label="收件人">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationCity" label="城市">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationDistrict" label="行政區">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="destinationAddress" label="地址">
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item name="estimatedDelivery" label="預計送達">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
       </Modal>
     </UnifiedPageLayout>
   );

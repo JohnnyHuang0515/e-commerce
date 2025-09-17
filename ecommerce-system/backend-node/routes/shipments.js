@@ -1,71 +1,140 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
 
 const { postgresPool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { asyncHandler, ValidationError, NotFoundError } = require('../middleware/errorHandler');
-const { getIdMapping } = require('../utils/idMapper');
 
 const router = express.Router();
+
+const mapStatusFromDb = (status) => {
+  if (!status) {
+    return 'pending';
+  }
+
+  const key = status.toString().toUpperCase();
+  const mapping = {
+    PENDING: 'pending',
+    PICKED_UP: 'processing',
+    IN_TRANSIT: 'in_transit',
+    OUT_FOR_DELIVERY: 'out_for_delivery',
+    DELIVERED: 'delivered',
+    FAILED: 'failed',
+    RETURNED: 'returned',
+    CANCELLED: 'cancelled',
+    CANCELED: 'cancelled',
+  };
+
+  return mapping[key] || key.toLowerCase();
+};
+
+const mapStatusToDb = (status) => {
+  if (!status) {
+    return 'PENDING';
+  }
+
+  const key = status.toString().toLowerCase();
+  const mapping = {
+    pending: 'PENDING',
+    processing: 'IN_TRANSIT',
+    in_transit: 'IN_TRANSIT',
+    out_for_delivery: 'OUT_FOR_DELIVERY',
+    delivered: 'DELIVERED',
+    failed: 'FAILED',
+    returned: 'RETURNED',
+    cancelled: 'CANCELLED',
+    canceled: 'CANCELLED',
+  };
+
+  return mapping[key] || status.toString().toUpperCase();
+};
+
+const normalizeDestination = (rawAddress = {}, fallbackAddress = {}) => {
+  const source = typeof rawAddress === 'object' && rawAddress !== null ? rawAddress : {};
+  const fallback = typeof fallbackAddress === 'object' && fallbackAddress !== null ? fallbackAddress : {};
+
+  return {
+    name: source.name || fallback.name || '',
+    city: source.city || fallback.city || '',
+    district: source.district || fallback.district || fallback.region || '',
+    address: source.address || fallback.address || fallback.line1 || '',
+  };
+};
 
 const normalizeShipmentRow = (row) => {
   if (!row) {
     return null;
   }
 
+  const destination = normalizeDestination(row.shipping_address);
   const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at;
   const updatedAt = row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at;
-  const estimatedDelivery =
-    row.estimated_delivery instanceof Date ? row.estimated_delivery.toISOString() : row.estimated_delivery;
+  const estimatedDelivery = row.estimated_delivery instanceof Date ? row.estimated_delivery.toISOString() : row.estimated_delivery;
 
   return {
-    id: row.public_id,
-    orderId: row.order_public_id,
-    userId: row.user_public_id,
-    status: (row.status || 'pending').toLowerCase(),
-    provider: row.provider || undefined,
-    method: row.method || undefined,
+    id: row.shipment_id,
+    orderId: row.order_number || row.order_id,
+    userId: row.user_id,
+    status: mapStatusFromDb(row.status),
+    provider: row.carrier || undefined,
+    method: row.shipping_method || undefined,
     trackingNumber: row.tracking_number || undefined,
-    destination: {
-      name: row.destination_name || '',
-      city: row.destination_city || '',
-      district: row.destination_district || '',
-      address: row.destination_address || row.shipping_address || '',
-    },
+    destination,
     estimatedDelivery: estimatedDelivery || undefined,
     updatedAt: updatedAt || createdAt,
     createdAt,
   };
 };
 
-const fetchShipmentByPublicId = async (publicId) => {
+const fetchShipmentById = async (shipmentId) => {
   const result = await postgresPool.query(
     `SELECT 
-       s.shipment_id,
-       s.public_id,
-       s.status,
-       s.carrier AS provider,
-       s.method,
-       s.tracking_number,
-       s.destination_name,
-       s.destination_city,
-       s.destination_district,
-       s.destination_address,
-       s.estimated_delivery,
-       s.created_at,
-       s.updated_at,
-       o.shipping_address,
-       o.public_id AS order_public_id,
-       u.public_id AS user_public_id
-     FROM shipments s
-     JOIN orders o ON s.order_id = o.order_id
-     JOIN users u ON o.user_id = u.user_id
-     WHERE s.public_id = $1`,
-    [publicId]
+       l.id AS shipment_id,
+       l.order_id,
+       o.order_number,
+       o.user_id,
+       l.status,
+       l.carrier,
+       l.shipping_method,
+       l.tracking_number,
+       l.shipping_address,
+       l.estimated_delivery,
+       l.actual_delivery,
+       l.created_at,
+       l.updated_at
+     FROM logistics l
+     JOIN orders o ON l.order_id = o.id
+     WHERE l.id::text = $1`,
+    [shipmentId]
   );
 
   return normalizeShipmentRow(result.rows[0]);
+};
+
+const findOrderByIdentifier = async (identifier) => {
+  if (!identifier) {
+    return null;
+  }
+
+  const result = await postgresPool.query(
+    `SELECT id, order_number, user_id, shipping_address
+     FROM orders
+     WHERE id::text = $1 OR order_number = $1
+     LIMIT 1`,
+    [identifier]
+  );
+
+  return result.rows[0] || null;
+};
+
+const buildShippingAddress = (destination = {}, orderShippingAddress = {}) => {
+  const normalized = normalizeDestination(destination, orderShippingAddress);
+
+  if (!normalized.name && !normalized.address) {
+    throw new ValidationError('請提供完整的配送地址資訊');
+  }
+
+  return normalized;
 };
 
 router.get(
@@ -73,7 +142,17 @@ router.get(
   authenticateToken,
   checkPermission('logistics:manage'),
   asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, status, provider, method } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      provider,
+      method,
+      orderId,
+      userId,
+      startDate,
+      endDate,
+    } = req.query;
 
     const numericPage = Number(page) || 1;
     const numericLimit = Number(limit) || 10;
@@ -84,20 +163,44 @@ router.get(
     let paramIndex = 1;
 
     if (status) {
-      conditions.push(`s.status = $${paramIndex}`);
-      params.push(String(status).toLowerCase());
+      conditions.push(`l.status = $${paramIndex}`);
+      params.push(mapStatusToDb(status));
       paramIndex += 1;
     }
 
     if (provider) {
-      conditions.push(`s.carrier = $${paramIndex}`);
+      conditions.push(`l.carrier = $${paramIndex}`);
       params.push(provider);
       paramIndex += 1;
     }
 
     if (method) {
-      conditions.push(`s.method = $${paramIndex}`);
+      conditions.push(`l.shipping_method = $${paramIndex}`);
       params.push(method);
+      paramIndex += 1;
+    }
+
+    if (orderId) {
+      conditions.push(`(o.id::text = $${paramIndex} OR o.order_number = $${paramIndex})`);
+      params.push(orderId);
+      paramIndex += 1;
+    }
+
+    if (userId) {
+      conditions.push(`o.user_id::text = $${paramIndex}`);
+      params.push(userId);
+      paramIndex += 1;
+    }
+
+    if (startDate) {
+      conditions.push(`l.created_at >= $${paramIndex}`);
+      params.push(new Date(startDate));
+      paramIndex += 1;
+    }
+
+    if (endDate) {
+      conditions.push(`l.created_at <= $${paramIndex}`);
+      params.push(new Date(endDate));
       paramIndex += 1;
     }
 
@@ -105,27 +208,23 @@ router.get(
 
     const listQuery = `
       SELECT 
-        s.shipment_id,
-        s.public_id,
-        s.status,
-        s.carrier AS provider,
-        s.method,
-        s.tracking_number,
-        s.destination_name,
-        s.destination_city,
-        s.destination_district,
-        s.destination_address,
-        s.estimated_delivery,
-        s.created_at,
-        s.updated_at,
-        o.shipping_address,
-        o.public_id AS order_public_id,
-        u.public_id AS user_public_id
-      FROM shipments s
-      JOIN orders o ON s.order_id = o.order_id
-      JOIN users u ON o.user_id = u.user_id
+        l.id AS shipment_id,
+        l.order_id,
+        o.order_number,
+        o.user_id,
+        l.status,
+        l.carrier,
+        l.shipping_method,
+        l.tracking_number,
+        l.shipping_address,
+        l.estimated_delivery,
+        l.actual_delivery,
+        l.created_at,
+        l.updated_at
+      FROM logistics l
+      JOIN orders o ON l.order_id = o.id
       ${whereClause}
-      ORDER BY s.created_at DESC
+      ORDER BY l.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
@@ -134,9 +233,8 @@ router.get(
       postgresPool.query(listQuery, listParams),
       postgresPool.query(
         `SELECT COUNT(*) AS total
-         FROM shipments s
-         JOIN orders o ON s.order_id = o.order_id
-         JOIN users u ON o.user_id = u.user_id
+         FROM logistics l
+         JOIN orders o ON l.order_id = o.id
          ${whereClause}`,
         params
       ),
@@ -165,11 +263,11 @@ router.get(
     const result = await postgresPool.query(`
       SELECT 
         COUNT(*) AS total,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS delivered,
-        COUNT(CASE WHEN status IN ('in_transit', 'out_for_delivery') THEN 1 END) AS in_transit,
-        COUNT(CASE WHEN status IN ('pending', 'processing') THEN 1 END) AS pending,
-        COUNT(CASE WHEN status IN ('failed', 'returned', 'cancelled') THEN 1 END) AS failed
-      FROM shipments
+        COUNT(CASE WHEN status = 'DELIVERED' THEN 1 END) AS delivered,
+        COUNT(CASE WHEN status IN ('IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP') THEN 1 END) AS in_transit,
+        COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pending,
+        COUNT(CASE WHEN status IN ('FAILED', 'RETURNED', 'CANCELLED') THEN 1 END) AS failed
+      FROM logistics
     `);
 
     const stats = result.rows[0] || {};
@@ -192,7 +290,7 @@ router.get(
   authenticateToken,
   checkPermission('logistics:manage'),
   asyncHandler(async (req, res) => {
-    const shipment = await fetchShipmentByPublicId(req.params.shipmentId);
+    const shipment = await fetchShipmentById(req.params.shipmentId);
 
     if (!shipment) {
       throw new NotFoundError('找不到指定的物流紀錄');
@@ -213,7 +311,7 @@ router.post(
       provider,
       method,
       trackingNumber,
-      destination = {},
+      destination,
       estimatedDelivery,
     } = req.body;
 
@@ -221,50 +319,41 @@ router.post(
       throw new ValidationError('請提供訂單 ID');
     }
 
-    const orderMapping = await getIdMapping('orders', orderId);
-    if (!orderMapping) {
+    const order = await findOrderByIdentifier(orderId);
+    if (!order) {
       throw new NotFoundError('找不到指定的訂單');
     }
 
-    const shipmentPublicId = uuidv4();
-    const normalizedStatus = String(status).toLowerCase();
-    const shippedAtStatuses = ['in_transit', 'out_for_delivery', 'delivered'];
-    const deliveredAtStatuses = ['delivered'];
+    const shippingAddress = buildShippingAddress(destination, order.shipping_address || {});
+    const dbStatus = mapStatusToDb(status);
+    const estimatedDeliveryDate = estimatedDelivery ? new Date(estimatedDelivery) : null;
+    const actualDeliveryDate = dbStatus === 'DELIVERED' ? new Date() : null;
 
-    await postgresPool.query(
-      `INSERT INTO shipments (
+    const insertResult = await postgresPool.query(
+      `INSERT INTO logistics (
          order_id,
-         status,
+         shipping_method,
          carrier,
-         method,
          tracking_number,
-         destination_name,
-         destination_city,
-         destination_district,
-         destination_address,
+         status,
+         shipping_address,
          estimated_delivery,
-         shipped_at,
-         delivered_at,
-         public_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+         actual_delivery
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
-        orderMapping.internal_id,
-        normalizedStatus,
-        provider || null,
-        method || null,
+        order.id,
+        method || '標準配送',
+        provider || 'manual',
         trackingNumber || null,
-        destination.name || null,
-        destination.city || null,
-        destination.district || null,
-        destination.address || null,
-        estimatedDelivery ? new Date(estimatedDelivery) : null,
-        shippedAtStatuses.includes(normalizedStatus) ? new Date() : null,
-        deliveredAtStatuses.includes(normalizedStatus) ? new Date() : null,
-        shipmentPublicId,
+        dbStatus,
+        shippingAddress,
+        estimatedDeliveryDate,
+        actualDeliveryDate,
       ]
     );
 
-    const shipment = await fetchShipmentByPublicId(shipmentPublicId);
+    const shipment = await fetchShipmentById(insertResult.rows[0].id);
 
     res.status(201).json({ success: true, data: shipment });
   })
@@ -286,7 +375,10 @@ router.put(
     } = req.body;
 
     const existing = await postgresPool.query(
-      `SELECT shipment_id FROM shipments WHERE public_id = $1 LIMIT 1`,
+      `SELECT id, order_id, shipping_address
+       FROM logistics
+       WHERE id::text = $1
+       LIMIT 1`,
       [shipmentId]
     );
 
@@ -299,29 +391,24 @@ router.put(
     let paramIndex = 1;
 
     if (status) {
-      const normalizedStatus = String(status).toLowerCase();
+      const dbStatus = mapStatusToDb(status);
       updates.push(`status = $${paramIndex}`);
-      params.push(normalizedStatus);
+      params.push(dbStatus);
       paramIndex += 1;
 
-      const shippedAtStatuses = ['in_transit', 'out_for_delivery', 'delivered'];
-      updates.push(`shipped_at = $${paramIndex}`);
-      params.push(shippedAtStatuses.includes(normalizedStatus) ? new Date() : null);
-      paramIndex += 1;
-
-      updates.push(`delivered_at = $${paramIndex}`);
-      params.push(normalizedStatus === 'delivered' ? new Date() : null);
+      updates.push(`actual_delivery = $${paramIndex}`);
+      params.push(dbStatus === 'DELIVERED' ? new Date() : null);
       paramIndex += 1;
     }
 
     if (provider !== undefined) {
       updates.push(`carrier = $${paramIndex}`);
-      params.push(provider || null);
+      params.push(provider ? provider.trim() : null);
       paramIndex += 1;
     }
 
     if (method !== undefined) {
-      updates.push(`method = $${paramIndex}`);
+      updates.push(`shipping_method = $${paramIndex}`);
       params.push(method || null);
       paramIndex += 1;
     }
@@ -333,20 +420,9 @@ router.put(
     }
 
     if (destination) {
-      updates.push(`destination_name = $${paramIndex}`);
-      params.push(destination.name || null);
-      paramIndex += 1;
-
-      updates.push(`destination_city = $${paramIndex}`);
-      params.push(destination.city || null);
-      paramIndex += 1;
-
-      updates.push(`destination_district = $${paramIndex}`);
-      params.push(destination.district || null);
-      paramIndex += 1;
-
-      updates.push(`destination_address = $${paramIndex}`);
-      params.push(destination.address || null);
+      const mergedAddress = buildShippingAddress(destination, existing.rows[0].shipping_address || {});
+      updates.push(`shipping_address = $${paramIndex}`);
+      params.push(mergedAddress);
       paramIndex += 1;
     }
 
@@ -363,17 +439,39 @@ router.put(
     }
 
     const updateQuery = `
-      UPDATE shipments
+      UPDATE logistics
       SET ${updates.join(', ')}
-      WHERE public_id = $${paramIndex}
+      WHERE id::text = $${paramIndex}
     `;
     params.push(shipmentId);
 
     await postgresPool.query(updateQuery, params);
 
-    const shipment = await fetchShipmentByPublicId(shipmentId);
+    const shipment = await fetchShipmentById(shipmentId);
 
     res.json({ success: true, data: shipment });
+  })
+);
+
+router.delete(
+  '/:shipmentId',
+  authenticateToken,
+  checkPermission('logistics:manage'),
+  asyncHandler(async (req, res) => {
+    const { shipmentId } = req.params;
+
+    const existing = await postgresPool.query(
+      `SELECT id FROM logistics WHERE id::text = $1 LIMIT 1`,
+      [shipmentId]
+    );
+
+    if (existing.rowCount === 0) {
+      throw new NotFoundError('找不到指定的物流紀錄');
+    }
+
+    await postgresPool.query('DELETE FROM logistics WHERE id = $1', [existing.rows[0].id]);
+
+    res.json({ success: true });
   })
 );
 

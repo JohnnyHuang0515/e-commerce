@@ -1,11 +1,9 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
 
 const { postgresPool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { asyncHandler, ValidationError, NotFoundError } = require('../middleware/errorHandler');
-const { getIdMapping } = require('../utils/idMapper');
 
 const router = express.Router();
 
@@ -14,40 +12,43 @@ const mapStatusFromDb = (status) => {
     return 'pending';
   }
 
-  const normalized = status.toLowerCase();
+  const key = status.toString().toUpperCase();
   const mapping = {
-    success: 'completed',
-    paid: 'completed',
-    completed: 'completed',
-    pending: 'pending',
-    processing: 'processing',
-    cancelled: 'cancelled',
-    canceled: 'cancelled',
-    refunded: 'refunded',
-    failed: 'failed',
+    PENDING: 'pending',
+    PROCESSING: 'processing',
+    IN_PROGRESS: 'processing',
+    COMPLETED: 'completed',
+    SUCCESS: 'completed',
+    PAID: 'completed',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled',
+    CANCELED: 'cancelled',
+    REFUNDED: 'refunded',
   };
 
-  return mapping[normalized] || normalized;
+  return mapping[key] || key.toLowerCase();
 };
 
 const mapStatusToDb = (status) => {
   if (!status) {
-    return 'pending';
+    return 'PENDING';
   }
 
-  const normalized = status.toLowerCase();
+  const key = status.toString().toLowerCase();
   const mapping = {
-    completed: 'success',
-    paid: 'success',
-    pending: 'pending',
-    processing: 'processing',
-    cancelled: 'cancelled',
-    canceled: 'cancelled',
-    refunded: 'refunded',
-    failed: 'failed',
+    pending: 'PENDING',
+    processing: 'PROCESSING',
+    in_progress: 'PROCESSING',
+    completed: 'SUCCESS',
+    success: 'SUCCESS',
+    paid: 'SUCCESS',
+    failed: 'FAILED',
+    cancelled: 'CANCELLED',
+    canceled: 'CANCELLED',
+    refunded: 'REFUNDED',
   };
 
-  return mapping[normalized] || normalized;
+  return mapping[key] || status.toString().toUpperCase();
 };
 
 const toCent = (amount) => {
@@ -78,48 +79,83 @@ const normalizePaymentRow = (row) => {
   }
 
   const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at;
-  const paidAt = row.paid_at instanceof Date ? row.paid_at.toISOString() : row.paid_at;
   const updatedAt = row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at;
+  const transactionId = row.transaction_id || row.external_payment_id || null;
 
   return {
-    id: row.public_id,
-    orderId: row.order_public_id,
-    userId: row.user_public_id,
+    id: row.payment_id,
+    orderId: row.order_number || row.order_id,
+    userId: row.user_id,
     amount: toCent(row.amount),
     currency: row.currency || 'TWD',
     method: row.payment_method,
-    provider: row.provider || undefined,
-    status: mapStatusFromDb(row.payment_status),
-    transactionId: row.transaction_id || undefined,
+    provider: row.payment_provider || undefined,
+    status: mapStatusFromDb(row.status),
+    transactionId: transactionId || undefined,
     createdAt,
-    updatedAt: updatedAt || paidAt || createdAt,
+    updatedAt,
   };
 };
 
-const fetchPaymentByPublicId = async (publicId) => {
+const fetchPaymentById = async (paymentId) => {
   const result = await postgresPool.query(
     `SELECT 
-       p.payment_id,
-       p.public_id,
+       p.id AS payment_id,
+       p.order_id,
+       o.order_number,
+       o.user_id,
        p.payment_method,
+       p.payment_provider,
        p.amount,
-       p.payment_status,
-       p.paid_at,
-       p.created_at,
-       p.updated_at,
        p.currency,
-       p.provider,
+       p.status,
        p.transaction_id,
-       o.public_id AS order_public_id,
-       u.public_id AS user_public_id
+       p.external_payment_id,
+       p.created_at,
+       p.updated_at
      FROM payments p
-     JOIN orders o ON p.order_id = o.order_id
-     JOIN users u ON o.user_id = u.user_id
-     WHERE p.public_id = $1`,
-    [publicId]
+     JOIN orders o ON p.order_id = o.id
+     WHERE p.id::text = $1`,
+    [paymentId]
   );
 
   return normalizePaymentRow(result.rows[0]);
+};
+
+const findOrderByIdentifier = async (identifier) => {
+  if (!identifier) {
+    return null;
+  }
+
+  const result = await postgresPool.query(
+    `SELECT id, order_number, user_id, shipping_address
+     FROM orders
+     WHERE id::text = $1 OR order_number = $1
+     LIMIT 1`,
+    [identifier]
+  );
+
+  return result.rows[0] || null;
+};
+
+const updateOrderPaymentMetadata = async (orderId, paymentId, dbStatus, method) => {
+  if (!orderId) {
+    return;
+  }
+
+  try {
+    await postgresPool.query(
+      `UPDATE orders
+       SET payment_status = $1,
+           payment_method = COALESCE($2, payment_method),
+           payment_id = $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [dbStatus, method || null, paymentId || null, orderId]
+    );
+  } catch (error) {
+    console.warn('更新訂單支付資訊失敗:', error.message);
+  }
 };
 
 router.get(
@@ -147,7 +183,7 @@ router.get(
     let paramIndex = 1;
 
     if (status) {
-      conditions.push(`p.payment_status = $${paramIndex}`);
+      conditions.push(`p.status = $${paramIndex}`);
       params.push(mapStatusToDb(status));
       paramIndex += 1;
     }
@@ -159,22 +195,14 @@ router.get(
     }
 
     if (userId) {
-      const userMapping = await getIdMapping('users', userId);
-      if (!userMapping) {
-        throw new NotFoundError('找不到指定的用戶');
-      }
-      conditions.push(`o.user_id = $${paramIndex}`);
-      params.push(userMapping.internal_id);
+      conditions.push(`o.user_id::text = $${paramIndex}`);
+      params.push(userId);
       paramIndex += 1;
     }
 
     if (orderId) {
-      const orderMapping = await getIdMapping('orders', orderId);
-      if (!orderMapping) {
-        throw new NotFoundError('找不到指定的訂單');
-      }
-      conditions.push(`p.order_id = $${paramIndex}`);
-      params.push(orderMapping.internal_id);
+      conditions.push(`(o.id::text = $${paramIndex} OR o.order_number = $${paramIndex})`);
+      params.push(orderId);
       paramIndex += 1;
     }
 
@@ -194,22 +222,21 @@ router.get(
 
     const listQuery = `
       SELECT 
-        p.payment_id,
-        p.public_id,
+        p.id AS payment_id,
+        p.order_id,
+        o.order_number,
+        o.user_id,
         p.payment_method,
+        p.payment_provider,
         p.amount,
-        p.payment_status,
-        p.paid_at,
-        p.created_at,
-        p.updated_at,
         p.currency,
-        p.provider,
+        p.status,
         p.transaction_id,
-        o.public_id AS order_public_id,
-        u.public_id AS user_public_id
+        p.external_payment_id,
+        p.created_at,
+        p.updated_at
       FROM payments p
-      JOIN orders o ON p.order_id = o.order_id
-      JOIN users u ON o.user_id = u.user_id
+      JOIN orders o ON p.order_id = o.id
       ${whereClause}
       ORDER BY p.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -221,8 +248,7 @@ router.get(
       postgresPool.query(
         `SELECT COUNT(*) AS total
          FROM payments p
-         JOIN orders o ON p.order_id = o.order_id
-         JOIN users u ON o.user_id = u.user_id
+         JOIN orders o ON p.order_id = o.id
          ${whereClause}`,
         params
       ),
@@ -252,12 +278,12 @@ router.get(
       SELECT 
         COUNT(*) AS total,
         SUM(amount) AS total_amount,
-        COUNT(CASE WHEN payment_status IN ('success', 'completed', 'paid') THEN 1 END) AS completed,
-        COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) AS pending,
-        COUNT(CASE WHEN payment_status = 'processing' THEN 1 END) AS processing,
-        COUNT(CASE WHEN payment_status = 'failed' THEN 1 END) AS failed,
-        COUNT(CASE WHEN payment_status = 'cancelled' THEN 1 END) AS cancelled,
-        COUNT(CASE WHEN payment_status = 'refunded' THEN 1 END) AS refunded
+        COUNT(CASE WHEN status IN ('SUCCESS') THEN 1 END) AS completed,
+        COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pending,
+        COUNT(CASE WHEN status = 'PROCESSING' THEN 1 END) AS processing,
+        COUNT(CASE WHEN status = 'FAILED' THEN 1 END) AS failed,
+        COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END) AS cancelled,
+        COUNT(CASE WHEN status = 'REFUNDED' THEN 1 END) AS refunded
       FROM payments
     `);
 
@@ -284,7 +310,7 @@ router.get(
   authenticateToken,
   checkPermission('payments:manage'),
   asyncHandler(async (req, res) => {
-    const payment = await fetchPaymentByPublicId(req.params.paymentId);
+    const payment = await fetchPaymentById(req.params.paymentId);
 
     if (!payment) {
       throw new NotFoundError('找不到指定的支付紀錄');
@@ -325,14 +351,14 @@ router.post(
       throw new ValidationError('請提供支付方式');
     }
 
-    const orderMapping = await getIdMapping('orders', orderId);
-    if (!orderMapping) {
+    const order = await findOrderByIdentifier(orderId);
+    if (!order) {
       throw new NotFoundError('找不到指定的訂單');
     }
 
     const existingPayment = await postgresPool.query(
-      'SELECT payment_id FROM payments WHERE order_id = $1 LIMIT 1',
-      [orderMapping.internal_id]
+      'SELECT id FROM payments WHERE order_id = $1 LIMIT 1',
+      [order.id]
     );
 
     if (existingPayment.rowCount > 0) {
@@ -340,37 +366,37 @@ router.post(
     }
 
     const dbStatus = mapStatusToDb(status);
-    const paidAt = ['success', 'completed', 'paid'].includes(dbStatus) ? new Date() : null;
-    const paymentPublicId = uuidv4();
+    const processedAt = ['COMPLETED', 'SUCCESS', 'PAID'].includes(dbStatus) ? new Date() : null;
+    const providerValue = provider?.trim() || 'manual';
 
-    await postgresPool.query(
+    const insertResult = await postgresPool.query(
       `INSERT INTO payments (
          order_id,
          payment_method,
+         payment_provider,
          amount,
-         payment_status,
-         paid_at,
-         public_id,
          currency,
-         provider,
-         transaction_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`;
-  })
-);
+         status,
+         transaction_id,
+         processed_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
-        orderMapping.internal_id,
+        order.id,
         method,
+        providerValue,
         toDecimal(amount),
+        currency || 'TWD',
         dbStatus,
-        paidAt,
-        paymentPublicId,
-        currency,
-        provider || null,
         transactionId || null,
+        processedAt,
       ]
     );
 
-    const payment = await fetchPaymentByPublicId(paymentPublicId);
+    const paymentId = insertResult.rows[0].id;
+    await updateOrderPaymentMetadata(order.id, paymentId, dbStatus, method);
+
+    const payment = await fetchPaymentById(paymentId);
 
     res.status(201).json({ success: true, data: payment });
   })
@@ -385,7 +411,7 @@ router.put(
     const { amount, method, status, currency, provider, transactionId } = req.body;
 
     const existing = await postgresPool.query(
-      `SELECT payment_id FROM payments WHERE public_id = $1 LIMIT 1`,
+      `SELECT id, order_id FROM payments WHERE id::text = $1 LIMIT 1`,
       [paymentId]
     );
 
@@ -396,6 +422,8 @@ router.put(
     const updates = [];
     const params = [];
     let paramIndex = 1;
+    let updatedStatus = null;
+    let updatedMethod = null;
 
     if (amount !== undefined) {
       if (Number(amount) <= 0) {
@@ -409,19 +437,21 @@ router.put(
     if (method) {
       updates.push(`payment_method = $${paramIndex}`);
       params.push(method);
+      updatedMethod = method;
       paramIndex += 1;
     }
 
     if (status) {
       const dbStatus = mapStatusToDb(status);
-      updates.push(`payment_status = $${paramIndex}`);
+      updates.push(`status = $${paramIndex}`);
       params.push(dbStatus);
       paramIndex += 1;
 
-      updates.push(`paid_at = $${paramIndex}`);
-      const paidAt = ['success', 'completed', 'paid'].includes(dbStatus) ? new Date() : null;
-      params.push(paidAt);
+      updates.push(`processed_at = $${paramIndex}`);
+      const processedAt = ['COMPLETED', 'SUCCESS', 'PAID'].includes(dbStatus) ? new Date() : null;
+      params.push(processedAt);
       paramIndex += 1;
+      updatedStatus = dbStatus;
     }
 
     if (currency) {
@@ -431,8 +461,8 @@ router.put(
     }
 
     if (provider !== undefined) {
-      updates.push(`provider = $${paramIndex}`);
-      params.push(provider || null);
+      updates.push(`payment_provider = $${paramIndex}`);
+      params.push(provider ? provider.trim() : null);
       paramIndex += 1;
     }
 
@@ -451,15 +481,43 @@ router.put(
     const updateQuery = `
       UPDATE payments
       SET ${updates.join(', ')}
-      WHERE public_id = $${paramIndex}
+      WHERE id::text = $${paramIndex}
     `;
     params.push(paymentId);
 
     await postgresPool.query(updateQuery, params);
 
-    const payment = await fetchPaymentByPublicId(paymentId);
+    const payment = await fetchPaymentById(paymentId);
+
+    const finalStatus = updatedStatus || mapStatusToDb(payment.status);
+    const finalMethod = updatedMethod || payment.method;
+    await updateOrderPaymentMetadata(existing.rows[0].order_id, paymentId, finalStatus, finalMethod);
 
     res.json({ success: true, data: payment });
+  })
+);
+
+router.delete(
+  '/:paymentId',
+  authenticateToken,
+  checkPermission('payments:manage'),
+  asyncHandler(async (req, res) => {
+    const { paymentId } = req.params;
+
+    const existing = await postgresPool.query(
+      `SELECT id, order_id FROM payments WHERE id::text = $1 LIMIT 1`,
+      [paymentId]
+    );
+
+    if (existing.rowCount === 0) {
+      throw new NotFoundError('找不到指定的支付紀錄');
+    }
+
+    await postgresPool.query('DELETE FROM payments WHERE id = $1', [existing.rows[0].id]);
+
+    await updateOrderPaymentMetadata(existing.rows[0].order_id, null, 'PENDING', null);
+
+    res.json({ success: true });
   })
 );
 

@@ -77,6 +77,8 @@ export class AuthService {
           'orders:read',
           'analytics:read',
           'inventory:manage',
+          'payments:manage',
+          'logistics:manage',
         ],
       };
 

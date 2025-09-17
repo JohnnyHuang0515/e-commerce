@@ -21,15 +21,54 @@ FAILED_DATABASES=0
 generate_postgresql_data() {
     echo -e "${BLUE}📊 生成 PostgreSQL 測試資料...${NC}"
     
+    # 先插入用戶資料
     if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "
 INSERT INTO users (name, email, password_hash, phone, status) VALUES 
 ('測試用戶1', 'test1@example.com', 'hash1', '0911111111', 'active'),
 ('測試用戶2', 'test2@example.com', 'hash2', '0922222222', 'active'),
-('測試用戶3', 'test3@example.com', 'hash3', '0933333333', 'active');
+('測試用戶3', 'test3@example.com', 'hash3', '0933333333', 'active')
+ON CONFLICT DO NOTHING;
 " > /dev/null 2>&1; then
+        echo -e "${GREEN}  ✅ 用戶資料插入成功${NC}"
+    else
+        echo -e "${RED}  ❌ 用戶資料插入失敗${NC}"
+    fi
+    
+    # 插入分類資料
+    if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "
+INSERT INTO categories (name, parent_id) VALUES 
+('電子產品', NULL),
+('服裝', NULL),
+('家居用品', NULL),
+('運動戶外', NULL),
+('美妝保養', NULL)
+ON CONFLICT DO NOTHING;
+" > /dev/null 2>&1; then
+        echo -e "${GREEN}  ✅ 分類資料插入成功${NC}"
+    else
+        echo -e "${RED}  ❌ 分類資料插入失敗${NC}"
+    fi
+    
+    # 插入商品資料
+    if docker exec ecommerce-postgresql psql -U ecommerce_user -d ecommerce_db -c "
+INSERT INTO products (name, price, stock_quantity, status, category_id) VALUES 
+('iPhone 15 Pro', 35900.00, 50, 'active', 1),
+('MacBook Air M2', 36900.00, 30, 'active', 1),
+('AirPods Pro', 7490.00, 100, 'active', 1),
+('Nike Air Max', 3200.00, 80, 'active', 4),
+('Adidas Ultraboost', 5800.00, 60, 'active', 4),
+('Levi''s 牛仔褲', 2500.00, 120, 'active', 2),
+('Uniqlo T-shirt', 590.00, 200, 'active', 2),
+('IKEA 書桌', 2990.00, 25, 'active', 3),
+('Dyson 吸塵器', 15900.00, 15, 'active', 3),
+('蘭蔻粉底液', 1680.00, 40, 'active', 5)
+ON CONFLICT DO NOTHING;
+" > /dev/null 2>&1; then
+        echo -e "${GREEN}  ✅ 商品資料插入成功${NC}"
         echo -e "${GREEN}✅ PostgreSQL 測試資料生成成功${NC}"
         COMPLETED_DATABASES=$((COMPLETED_DATABASES + 1))
     else
+        echo -e "${RED}  ❌ 商品資料插入失敗${NC}"
         echo -e "${RED}❌ PostgreSQL 測試資料生成失敗${NC}"
         FAILED_DATABASES=$((FAILED_DATABASES + 1))
     fi
