@@ -1,419 +1,400 @@
 const express = require('express');
-const router = express.Router();
-const { postgresPool } = require('../config/database');
+
+const { postgresPool, mongoClient, redisClient } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 
-// 獲取真實的警告數據
-async function getRealAlerts() {
+const router = express.Router();
+
+const ACTIVE_PRODUCT_STATUSES = ['active'];
+const FINAL_ORDER_STATUSES = ['COMPLETED', 'DELIVERED'];
+const IN_TRANSIT_STATUSES = ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'];
+const FAILED_LOGISTICS_STATUSES = ['FAILED', 'RETURNED', 'CANCELLED'];
+
+const coerceNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getLowInventoryAlerts = async () => {
   try {
-    // 檢查低庫存商品
-    const lowStockResult = await postgresPool.query(`
-      SELECT name, stock_quantity
-      FROM products
-      WHERE status = 1 AND stock_quantity < 10
-      ORDER BY stock_quantity ASC
-      LIMIT 5
-    `);
+    const result = await postgresPool.query(
+      `SELECT 
+         p.name,
+         inv.quantity,
+         inv.reorder_point
+       FROM inventory inv
+       JOIN products p ON inv.product_id = p.id
+       WHERE inv.status = 'active'
+       ORDER BY inv.quantity ASC
+       LIMIT 5`
+    );
 
-    const alerts = [];
-    
-    // 生成庫存警告
-    lowStockResult.rows.forEach((product, index) => {
-      alerts.push({
-        _id: `alert-stock-${index + 1}`,
-        title: '庫存警告',
-        message: `${product.name} 庫存不足 (剩餘: ${product.stock_quantity})`,
-        type: 'warning',
-        severity: product.stock_quantity < 5 ? 'high' : 'medium',
-        source: 'inventory',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-    });
-
-    return alerts;
+    return result.rows.map((row, index) => ({
+      _id: `inventory-${index + 1}`,
+      title: '庫存警告',
+      message: `${row.name} 庫存僅剩 ${row.quantity} 件` +
+        (row.quantity <= row.reorder_point ? '（低於補貨門檻）' : ''),
+      type: 'warning',
+      severity: row.quantity <= row.reorder_point ? 'high' : 'medium',
+      source: 'inventory',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
   } catch (error) {
-    console.error('獲取警告數據失敗:', error);
+    console.error('取得庫存警示失敗:', error);
     return [];
   }
-}
+};
 
-// Dashboard 概覽數據
-router.get('/overview', authenticateToken, checkPermission('products:read'), async (req, res) => {
-  try {
-    // 獲取當月統計數據
-    const [salesResult, ordersResult, usersResult, productsResult] = await Promise.all([
-      // 當月銷售額
-      postgresPool.query(`
-        SELECT COALESCE(SUM(total_amount), 0) as total_sales
-        FROM orders 
-        WHERE status = 'COMPLETED'
-        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
-      `),
-      
-      // 當月訂單數
-      postgresPool.query(`
-        SELECT COUNT(*) as total_orders
-        FROM orders
-        WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
-      `),
-      
-      // 當月新增用戶數
-      postgresPool.query(`
-        SELECT COUNT(*) as total_users
-        FROM users
-        WHERE status = 1
-        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
-      `),
-      
-      // 當月新增商品數
-      postgresPool.query(`
-        SELECT COUNT(*) as total_products
-        FROM products
-        WHERE status = 1
-        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
-      `)
-    ]);
+router.get(
+  '/overview',
+  authenticateToken,
+  checkPermission('products:read'),
+  async (req, res) => {
+    try {
+      const startOfMonth = `date_trunc('month', CURRENT_DATE)`;
+      const startOfLastMonth = `date_trunc('month', CURRENT_DATE - INTERVAL '1 month')`;
 
-    const totalSales = parseFloat(salesResult.rows[0].total_sales) || 0;
-    const totalOrders = parseInt(ordersResult.rows[0].total_orders) || 0;
-    const totalUsers = parseInt(usersResult.rows[0].total_users) || 0;
-    const totalProducts = parseInt(productsResult.rows[0].total_products) || 0;
+      const [salesRow, ordersRow, usersRow, productsRow] = await Promise.all([
+        postgresPool.query(
+          `SELECT COALESCE(SUM(total_amount), 0) AS value
+           FROM orders
+           WHERE status = ANY($1)
+             AND created_at >= ${startOfMonth}`,
+          [FINAL_ORDER_STATUSES]
+        ),
+        postgresPool.query(
+          `SELECT COUNT(*) AS value
+           FROM orders
+           WHERE created_at >= ${startOfMonth}`
+        ),
+        postgresPool.query(
+          `SELECT COUNT(*) AS value
+           FROM users
+           WHERE status = 'active'
+             AND created_at >= ${startOfMonth}`
+        ),
+        postgresPool.query(
+          `SELECT COUNT(*) AS value
+           FROM products
+           WHERE status = ANY($1)`,
+          [ACTIVE_PRODUCT_STATUSES]
+        ),
+      ]);
 
-    // 計算平均訂單價值
-    const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+      const totalSales = coerceNumber(salesRow.rows[0]?.value);
+      const totalOrders = coerceNumber(ordersRow.rows[0]?.value);
+      const totalUsers = coerceNumber(usersRow.rows[0]?.value);
+      const totalProducts = coerceNumber(productsRow.rows[0]?.value);
+      const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
-    // 計算增長率（與上個月比較）
-    const [lastMonthSalesResult, lastMonthOrdersResult, lastMonthUsersResult] = await Promise.all([
-      // 上個月銷售額
-      postgresPool.query(`
-        SELECT COALESCE(SUM(total_amount), 0) as last_month_sales
-        FROM orders 
-        WHERE status = 'COMPLETED' 
-        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE - INTERVAL '1 month')
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE - INTERVAL '1 month')
-      `),
-      
-      // 上個月訂單數
-      postgresPool.query(`
-        SELECT COUNT(*) as last_month_orders
-        FROM orders
-        WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE - INTERVAL '1 month')
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE - INTERVAL '1 month')
-      `),
-      
-      // 上個月新增用戶數
-      postgresPool.query(`
-        SELECT COUNT(*) as last_month_users
-        FROM users
-        WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE - INTERVAL '1 month')
-        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE - INTERVAL '1 month')
-      `)
-    ]);
+      const [lastMonthSalesRow, lastMonthOrdersRow, lastMonthUsersRow] = await Promise.all([
+        postgresPool.query(
+          `SELECT COALESCE(SUM(total_amount), 0) AS value
+           FROM orders
+           WHERE status = ANY($1)
+             AND created_at >= ${startOfLastMonth}
+             AND created_at < ${startOfMonth}`,
+          [FINAL_ORDER_STATUSES]
+        ),
+        postgresPool.query(
+          `SELECT COUNT(*) AS value
+           FROM orders
+           WHERE created_at >= ${startOfLastMonth}
+             AND created_at < ${startOfMonth}`
+        ),
+        postgresPool.query(
+          `SELECT COUNT(*) AS value
+           FROM users
+           WHERE status = 'active'
+             AND created_at >= ${startOfLastMonth}
+             AND created_at < ${startOfMonth}`
+        ),
+      ]);
 
-    const lastMonthSales = parseFloat(lastMonthSalesResult.rows[0].last_month_sales) || 0;
-    const lastMonthOrders = parseInt(lastMonthOrdersResult.rows[0].last_month_orders) || 0;
-    const lastMonthUsers = parseInt(lastMonthUsersResult.rows[0].last_month_users) || 0;
+      const lastMonthSales = coerceNumber(lastMonthSalesRow.rows[0]?.value);
+      const lastMonthOrders = coerceNumber(lastMonthOrdersRow.rows[0]?.value);
+      const lastMonthUsers = coerceNumber(lastMonthUsersRow.rows[0]?.value);
 
-    // 計算增長率
-    const salesGrowth = lastMonthSales > 0 ? ((totalSales - lastMonthSales) / lastMonthSales) * 100 : (totalSales > 0 ? 100 : 0);
-    const ordersGrowth = lastMonthOrders > 0 ? ((totalOrders - lastMonthOrders) / lastMonthOrders) * 100 : (totalOrders > 0 ? 100 : 0);
-    const usersGrowth = lastMonthUsers > 0 ? ((totalUsers - lastMonthUsers) / lastMonthUsers) * 100 : (totalUsers > 0 ? 100 : 0);
+      const calculateGrowth = (current, previous) => {
+        if (previous > 0) {
+          return ((current - previous) / previous) * 100;
+        }
+        return current > 0 ? 100 : 0;
+      };
 
-    // 獲取當月每日銷售數據
-    const dailySalesResult = await postgresPool.query(`
-      SELECT 
-        DATE(created_at) as date,
-        COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) as sales,
-        COUNT(*) as orders,
-        COUNT(DISTINCT user_id) as users
-      FROM orders
-      WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
-      AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
-      GROUP BY DATE(created_at)
-      ORDER BY date
-    `);
+      const [dailySalesResult, alerts] = await Promise.all([
+        postgresPool.query(
+          `SELECT 
+             date_trunc('day', created_at) AS day,
+             COALESCE(SUM(total_amount), 0) AS revenue,
+             COUNT(*) AS order_count,
+             COUNT(DISTINCT user_id) AS user_count
+           FROM orders
+           WHERE created_at >= ${startOfMonth}
+           GROUP BY date_trunc('day', created_at)
+           ORDER BY day`
+        ),
+        getLowInventoryAlerts(),
+      ]);
 
-    const dailySalesData = dailySalesResult.rows.map(row => ({
-      date: row.date.toISOString().split('T')[0],
-      sales: parseFloat(row.sales) || 0,
-      orders: parseInt(row.orders) || 0,
-      users: parseInt(row.users) || 0
-    }));
+      const periodData = dailySalesResult.rows.map((row) => ({
+        date: row.day.toISOString().slice(0, 10),
+        sales: coerceNumber(row.revenue),
+        orders: coerceNumber(row.order_count),
+        users: coerceNumber(row.user_count),
+      }));
 
-    const overviewData = {
-      summary: {
-        totalSales,
-        totalOrders,
-        totalUsers,
-        totalProducts,
-        averageOrderValue: Math.round(averageOrderValue * 100) / 100,
-        conversionRate: totalUsers > 0 ? Math.round((totalOrders / totalUsers) * 100 * 100) / 100 : 0
-      },
-      periodData: dailySalesData,
-      growth: {
-        salesGrowth,
-        ordersGrowth,
-        usersGrowth
-      },
-      alerts: await getRealAlerts(),
-      systemStatus: {
-        services: [
-          {
-            name: 'PostgreSQL',
-            status: 'healthy',
-            responseTime: 15,
-            lastCheck: new Date().toISOString()
+      res.json({
+        success: true,
+        data: {
+          summary: {
+            totalSales,
+            totalOrders,
+            totalUsers,
+            totalProducts,
+            averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+            conversionRate:
+              totalUsers > 0
+                ? Math.round((totalOrders / totalUsers) * 10000) / 100
+                : 0,
           },
-          {
-            name: 'MongoDB',
-            status: 'healthy',
-            responseTime: 8,
-            lastCheck: new Date().toISOString()
+          periodData,
+          growth: {
+            salesGrowth: calculateGrowth(totalSales, lastMonthSales),
+            ordersGrowth: calculateGrowth(totalOrders, lastMonthOrders),
+            usersGrowth: calculateGrowth(totalUsers, lastMonthUsers),
           },
-          {
-            name: 'Redis',
-            status: 'healthy',
-            responseTime: 2,
-            lastCheck: new Date().toISOString()
-          }
-        ]
-      }
-    };
-
-    res.json({
-      success: true,
-      data: overviewData
-    });
-
-  } catch (error) {
-    console.error('獲取概覽數據失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: '獲取概覽數據失敗',
-      code: 'INTERNAL_ERROR',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// 每日銷售數據
-router.get('/daily-sales', authenticateToken, checkPermission('products:read'), async (req, res) => {
-  try {
-    const { period = 'month' } = req.query;
-    
-    // 根據期間獲取真實數據
-    let dateCondition = '';
-    if (period === 'week') {
-      dateCondition = `AND created_at >= CURRENT_DATE - INTERVAL '7 days'`;
-    } else if (period === 'month') {
-      dateCondition = `AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)`;
-    } else if (period === 'year') {
-      dateCondition = `AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)`;
+          alerts,
+          systemStatus: {
+            services: [
+              {
+                name: 'PostgreSQL',
+                status: 'healthy',
+                responseTime: 0,
+                lastCheck: new Date().toISOString(),
+              },
+              {
+                name: 'MongoDB',
+                status: 'healthy',
+                responseTime: 0,
+                lastCheck: new Date().toISOString(),
+              },
+              {
+                name: 'Redis',
+                status: 'healthy',
+                responseTime: 0,
+                lastCheck: new Date().toISOString(),
+              },
+            ],
+          },
+        },
+      });
+    } catch (error) {
+      console.error('獲取概覽數據失敗:', error);
+      res.status(500).json({
+        success: false,
+        error: '獲取概覽數據失敗',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString(),
+      });
     }
-    
-    const dailySalesResult = await postgresPool.query(`
-      SELECT 
-        DATE(created_at) as date,
-        COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) as sales
-      FROM orders
-      WHERE 1=1 ${dateCondition}
-      GROUP BY DATE(created_at)
-      ORDER BY date
-    `);
-    
-    const dailySalesData = dailySalesResult.rows.map(row => ({
-      date: row.date.toISOString().split('T')[0],
-      sales: parseFloat(row.sales) || 0
-    }));
-
-    res.json({
-      success: true,
-      data: dailySalesData
-    });
-
-  } catch (error) {
-    console.error('獲取每日銷售數據失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: '獲取每日銷售數據失敗',
-      code: 'INTERNAL_ERROR',
-      timestamp: new Date().toISOString()
-    });
   }
-});
+);
 
-// 訂單狀態分布
-router.get('/order-status', authenticateToken, checkPermission('orders:read'), async (req, res) => {
-  try {
-    const result = await postgresPool.query(`
-      SELECT 
-        CASE 
-          WHEN status = 'PENDING' THEN 'PENDING'
-          WHEN status = 'PROCESSING' THEN 'PROCESSING'
-          WHEN status = 'COMPLETED' THEN 'COMPLETED'
-          WHEN status = 'CANCELLED' THEN 'CANCELLED'
-          ELSE 'OTHER'
-        END as status,
-        COUNT(*) as count
-      FROM orders
-      GROUP BY 
-        CASE 
-          WHEN status = 'PENDING' THEN 'PENDING'
-          WHEN status = 'PROCESSING' THEN 'PROCESSING'
-          WHEN status = 'COMPLETED' THEN 'COMPLETED'
-          WHEN status = 'CANCELLED' THEN 'CANCELLED'
-          ELSE 'OTHER'
-        END
-    `);
+router.get(
+  '/daily-sales',
+  authenticateToken,
+  checkPermission('products:read'),
+  async (req, res) => {
+    try {
+      const { period = 'month' } = req.query;
+      let dateFromClause = 'created_at >= date_trunc(\'month\', CURRENT_DATE)';
 
-    const orderStatusData = result.rows.map(row => ({
-      status: row.status,
-      count: parseInt(row.count)
-    }));
+      if (period === 'week') {
+        dateFromClause = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+      } else if (period === 'year') {
+        dateFromClause = "created_at >= date_trunc('year', CURRENT_DATE)";
+      }
 
-    res.json({
-      success: true,
-      data: orderStatusData
-    });
+      const result = await postgresPool.query(
+        `SELECT 
+           date_trunc('day', created_at) AS day,
+           COALESCE(SUM(total_amount), 0) AS revenue
+         FROM orders
+         WHERE ${dateFromClause}
+         GROUP BY date_trunc('day', created_at)
+         ORDER BY day`
+      );
 
-  } catch (error) {
-    console.error('獲取訂單狀態數據失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: '獲取訂單狀態數據失敗',
-      code: 'INTERNAL_ERROR',
-      timestamp: new Date().toISOString()
-    });
+      const data = result.rows.map((row) => ({
+        date: row.day.toISOString().slice(0, 10),
+        sales: coerceNumber(row.revenue),
+      }));
+
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('獲取每日銷售數據失敗:', error);
+      res.status(500).json({
+        success: false,
+        error: '獲取每日銷售數據失敗',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
-});
+);
 
-// 熱門商品
-router.get('/popular-products', authenticateToken, checkPermission('products:read'), async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-    
-    // 獲取商品數據
-    const result = await postgresPool.query(`
-      SELECT 
-        p.product_id,
-        p.public_id,
-        p.name,
-        p.price,
-        p.stock_quantity,
-        COALESCE(SUM(oi.quantity), 0) as sales_count,
-        COALESCE(SUM(oi.quantity * oi.price), 0) as total_sales
-      FROM products p
-      LEFT JOIN order_items oi ON p.product_id = oi.product_id
-      LEFT JOIN orders o ON oi.order_id = o.order_id AND o.status = 'COMPLETED'
-      WHERE p.status = 1
-      GROUP BY p.product_id, p.public_id, p.name, p.price, p.stock_quantity
-      ORDER BY total_sales DESC
-      LIMIT $1
-    `, [parseInt(limit)]);
+router.get(
+  '/order-status',
+  authenticateToken,
+  checkPermission('orders:read'),
+  async (req, res) => {
+    try {
+      const result = await postgresPool.query(
+        `SELECT status, COUNT(*) AS count
+         FROM orders
+         GROUP BY status`
+      );
 
-    const popularProducts = result.rows.map(row => ({
-      id: row.public_id,
-      name: row.name,
-      price: parseFloat(row.price),
-      stock: parseInt(row.stock_quantity),
-      salesCount: parseInt(row.sales_count),
-      totalSales: parseFloat(row.total_sales)
-    }));
+      const data = result.rows.map((row) => ({
+        status: row.status,
+        count: coerceNumber(row.count),
+      }));
 
-    res.json({
-      success: true,
-      data: popularProducts
-    });
-
-  } catch (error) {
-    console.error('獲取熱門商品數據失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: '獲取熱門商品數據失敗',
-      code: 'INTERNAL_ERROR',
-      timestamp: new Date().toISOString()
-    });
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('獲取訂單狀態數據失敗:', error);
+      res.status(500).json({
+        success: false,
+        error: '獲取訂單狀態數據失敗',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
-});
+);
 
-// 系統健康狀態
+router.get(
+  '/popular-products',
+  authenticateToken,
+  checkPermission('products:read'),
+  async (req, res) => {
+    try {
+      const limit = coerceNumber(req.query.limit) || 10;
+
+      const result = await postgresPool.query(
+        `WITH product_sales AS (
+           SELECT 
+             oi.product_id,
+             SUM(oi.quantity) AS total_quantity,
+             SUM(oi.total_price) AS total_revenue
+           FROM order_items oi
+           JOIN orders o ON oi.order_id = o.id
+           WHERE o.status = ANY($1)
+           GROUP BY oi.product_id
+         )
+         SELECT 
+           p.id,
+           p.name,
+           p.price,
+           COALESCE(inv.quantity, 0) AS stock,
+           COALESCE(ps.total_quantity, 0) AS sales_count,
+           COALESCE(ps.total_revenue, 0) AS total_sales
+         FROM products p
+         LEFT JOIN product_sales ps ON ps.product_id = p.id
+         LEFT JOIN inventory inv ON inv.product_id = p.id
+         WHERE p.status = ANY($2)
+         ORDER BY ps.total_revenue DESC NULLS LAST
+         LIMIT $3`,
+        [FINAL_ORDER_STATUSES, ACTIVE_PRODUCT_STATUSES, limit]
+      );
+
+      const data = result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        price: coerceNumber(row.price),
+        stock: coerceNumber(row.stock),
+        salesCount: coerceNumber(row.sales_count),
+        totalSales: coerceNumber(row.total_sales),
+      }));
+
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('獲取熱門商品數據失敗:', error);
+      res.status(500).json({
+        success: false,
+        error: '獲取熱門商品數據失敗',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
+
 router.get('/health', async (req, res) => {
   try {
-    const { postgresPool, mongoClient, redisClient } = require('../config/database');
-    
     const health = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      services: {}
+      services: {},
     };
-    
-    // 檢查 PostgreSQL
+
     try {
       const start = Date.now();
       await postgresPool.query('SELECT NOW()');
-      health.services.postgresql = { 
-        status: 'healthy', 
-        response_time: Date.now() - start 
+      health.services.postgresql = {
+        status: 'healthy',
+        responseTime: Date.now() - start,
       };
     } catch (error) {
-      health.services.postgresql = { 
-        status: 'unhealthy', 
-        error: error.message 
+      health.services.postgresql = {
+        status: 'unhealthy',
+        error: error.message,
       };
       health.status = 'degraded';
     }
-    
-    // 檢查 MongoDB
+
     try {
       const start = Date.now();
       await mongoClient.db('admin').admin().ping();
-      health.services.mongodb = { 
-        status: 'healthy', 
-        response_time: Date.now() - start 
+      health.services.mongodb = {
+        status: 'healthy',
+        responseTime: Date.now() - start,
       };
     } catch (error) {
-      health.services.mongodb = { 
-        status: 'unhealthy', 
-        error: error.message 
+      health.services.mongodb = {
+        status: 'unhealthy',
+        error: error.message,
       };
       health.status = 'degraded';
     }
-    
-    // 檢查 Redis
+
     try {
       const start = Date.now();
       await redisClient.ping();
-      health.services.redis = { 
-        status: 'healthy', 
-        response_time: Date.now() - start 
+      health.services.redis = {
+        status: 'healthy',
+        responseTime: Date.now() - start,
       };
     } catch (error) {
-      health.services.redis = { 
-        status: 'unhealthy', 
-        error: error.message 
+      health.services.redis = {
+        status: 'unhealthy',
+        error: error.message,
       };
       health.status = 'degraded';
     }
 
-    res.json({
-      success: true,
-      data: health
-    });
-
+    res.json({ success: true, data: health });
   } catch (error) {
     console.error('獲取系統健康狀態失敗:', error);
     res.status(500).json({
       success: false,
       error: '獲取系統健康狀態失敗',
       code: 'INTERNAL_ERROR',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
