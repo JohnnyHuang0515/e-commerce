@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { postgresPool, authenticateToken } = require('../config/database');
+const { postgresPool } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 
 // 獲取真實的警告數據

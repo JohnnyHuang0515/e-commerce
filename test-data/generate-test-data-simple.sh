@@ -106,8 +106,15 @@ generate_milvus_data() {
     # 檢查 Milvus 服務是否正常
     if curl -f http://localhost:9091/healthz > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Milvus 服務正常運行${NC}"
-        echo -e "${YELLOW}⚠️ Milvus 容器中沒有 Python，跳過測試資料生成${NC}"
-        COMPLETED_DATABASES=$((COMPLETED_DATABASES + 1))
+        
+        # 使用主機上的 Python 腳本生成測試資料
+        if python3 generate-milvus-data-simple.py > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ Milvus 測試資料生成成功${NC}"
+            COMPLETED_DATABASES=$((COMPLETED_DATABASES + 1))
+        else
+            echo -e "${RED}❌ Milvus 測試資料生成失敗${NC}"
+            FAILED_DATABASES=$((FAILED_DATABASES + 1))
+        fi
     else
         echo -e "${RED}❌ Milvus 服務異常${NC}"
         FAILED_DATABASES=$((FAILED_DATABASES + 1))
