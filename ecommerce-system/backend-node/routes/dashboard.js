@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { postgresPool, authenticateToken } = require('../config/database');
+const { postgresPool } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 
 // 獲取真實的警告數據
@@ -40,35 +41,43 @@ async function getRealAlerts() {
 }
 
 // Dashboard 概覽數據
-router.get('/overview', authenticateToken, checkPermission('view_products'), async (req, res) => {
+router.get('/overview', authenticateToken, checkPermission('products:read'), async (req, res) => {
   try {
-    // 獲取基本統計數據
+    // 獲取當月統計數據
     const [salesResult, ordersResult, usersResult, productsResult] = await Promise.all([
-      // 總銷售額
+      // 當月銷售額
       postgresPool.query(`
         SELECT COALESCE(SUM(total_amount), 0) as total_sales
         FROM orders 
         WHERE status = 'COMPLETED'
+        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
       `),
       
-      // 總訂單數
+      // 當月訂單數
       postgresPool.query(`
         SELECT COUNT(*) as total_orders
         FROM orders
+        WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
       `),
       
-      // 總用戶數
+      // 當月新增用戶數
       postgresPool.query(`
         SELECT COUNT(*) as total_users
         FROM users
         WHERE status = 1
+        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
       `),
       
-      // 總商品數
+      // 當月新增商品數
       postgresPool.query(`
         SELECT COUNT(*) as total_products
         FROM products
         WHERE status = 1
+        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
       `)
     ]);
 
@@ -195,7 +204,7 @@ router.get('/overview', authenticateToken, checkPermission('view_products'), asy
 });
 
 // 每日銷售數據
-router.get('/daily-sales', authenticateToken, checkPermission('view_products'), async (req, res) => {
+router.get('/daily-sales', authenticateToken, checkPermission('products:read'), async (req, res) => {
   try {
     const { period = 'month' } = req.query;
     
@@ -241,7 +250,7 @@ router.get('/daily-sales', authenticateToken, checkPermission('view_products'), 
 });
 
 // 訂單狀態分布
-router.get('/order-status', authenticateToken, checkPermission('view_orders'), async (req, res) => {
+router.get('/order-status', authenticateToken, checkPermission('orders:read'), async (req, res) => {
   try {
     const result = await postgresPool.query(`
       SELECT 
@@ -286,7 +295,7 @@ router.get('/order-status', authenticateToken, checkPermission('view_orders'), a
 });
 
 // 熱門商品
-router.get('/popular-products', authenticateToken, checkPermission('view_products'), async (req, res) => {
+router.get('/popular-products', authenticateToken, checkPermission('products:read'), async (req, res) => {
   try {
     const { limit = 10 } = req.query;
     

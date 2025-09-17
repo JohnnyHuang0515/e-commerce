@@ -8,8 +8,6 @@ import {
   Space,
   message,
   Divider,
-  Row,
-  Col,
 } from 'antd';
 import { AuthService } from '../../services/authService';
 import {

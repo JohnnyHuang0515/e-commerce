@@ -1,12 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const { 
-  postgresPool, 
-  authenticateToken,
-  getUserByPublicId,
-  getIdMapping 
-} = require('../config/database');
+const { postgresPool } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const { getUserByPublicId } = require('../services/userService');
+const { getUserPermissions } = require('../services/permissionService');
+const { getIdMapping } = require('../utils/idMapper');
 const { checkPermission, checkResourceOwner } = require('../middleware/rbac');
 const { asyncHandler, ValidationError, NotFoundError } = require('../middleware/errorHandler');
 
@@ -188,7 +187,6 @@ router.get('/:publicId', authenticateToken, checkPermission('view_users'), async
   `, [user.user_id]);
   
   // 獲取用戶權限
-  const { getUserPermissions } = require('../config/database');
   const permissions = await getUserPermissions(user.user_id);
   
   res.json({

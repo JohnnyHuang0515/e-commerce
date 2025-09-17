@@ -2,10 +2,10 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { 
   postgresPool, 
-  authenticateToken,
   redisClient,
-  getIdMapping 
 } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const { getIdMapping } = require('../utils/idMapper');
 const { checkPermission } = require('../middleware/rbac');
 const { asyncHandler, ValidationError, NotFoundError } = require('../middleware/errorHandler');
 

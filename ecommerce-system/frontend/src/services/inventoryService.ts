@@ -1,155 +1,97 @@
-import { inventoryApi, ApiResponse, PaginatedResponse } from './api';
+import { inventoryApi } from './api';
+import { ApiResponse } from '../types/api';
 
-// 庫存相關類型定義
-export interface Inventory {
-  _id: string;
-  productId: string;
-  sku: string;
-  currentStock: number;
-  reservedStock: number;
-  availableStock: number;
-  minStock: number;
-  maxStock: number;
-  status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'discontinued';
-  location: {
-    warehouse: string;
-    zone?: string;
-    shelf?: string;
-    position?: string;
-  };
-  unitCost: number;
-  totalValue: number;
-  lastUpdated: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { InventoryItem, InventoryStats } from '../types/api';
 
-export interface InventoryTransaction {
-  _id: string;
-  transactionId: string;
-  productId: string;
-  type: 'purchase' | 'sale' | 'return' | 'adjustment' | 'transfer';
-  quantity: number;
-  previousStock: number;
-  newStock: number;
-  referenceId?: string;
-  notes?: string;
-  performedBy: string;
-  performedAt: string;
-}
-
-export interface InventoryCreateRequest {
-  productId: string;
-  sku: string;
-  initialStock: number;
-  minStock: number;
-  maxStock: number;
-  unitCost: number;
-  location: {
-    warehouse: string;
-    zone?: string;
-    shelf?: string;
-    position?: string;
-  };
-}
-
-export interface InventoryUpdateRequest {
-  quantity: number;
-  type: 'purchase' | 'sale' | 'adjustment';
-  reason: string;
-  referenceId?: string;
-  notes?: string;
-}
-
-export interface StockReservationRequest {
-  quantity: number;
-  orderId: string;
-}
-
-export interface InventoryStats {
-    totalProducts: number;
-    totalStock: number;
-    totalValue: number;
-    lowStockProducts: number;
-    outOfStockProducts: number;
-}
-
-export interface InventorySearchParams {
+export interface InventoryListParams {
   page?: number;
   limit?: number;
-  status?: string;
-  lowStock?: boolean;
   search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  category_id?: string | number;
+  low_stock?: boolean;
 }
 
-// 庫存服務類
+export interface InventoryListResponse {
+  items: InventoryItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface InventoryAdjustRequest {
+  adjustment: number;
+  reason: string;
+  notes?: string;
+}
+
+export interface InventoryAdjustmentResult {
+  product_id: string;
+  product_name: string;
+  old_stock: number;
+  adjustment: number;
+  new_stock: number;
+  reason: string;
+  notes?: string;
+  updated_at: string;
+}
+
 export class InventoryService {
-  // 獲取庫存列表
-  static async getInventories(params?: InventorySearchParams): Promise<ApiResponse<PaginatedResponse<Inventory>>> {
-    const response = await inventoryApi.get('/v1/inventory', { params });
+  static async getInventories(params: InventoryListParams = {}): Promise<ApiResponse<InventoryListResponse>> {
+    const queryParams: Record<string, string | number | undefined> = {
+      page: params.page,
+      limit: params.limit,
+      search: params.search,
+      category_id: params.category_id ? Number(params.category_id) : undefined,
+    };
+
+    if (typeof params.low_stock === 'boolean') {
+      queryParams.low_stock = params.low_stock ? 'true' : 'false';
+    }
+
+    const response = await inventoryApi.get('/v1/inventory', {
+      params: queryParams,
+    });
+
     return response.data;
   }
 
-  // 獲取庫存詳情
-  static async getInventory(productId: string): Promise<ApiResponse<Inventory>> {
-    const response = await inventoryApi.get(`/v1/inventory/${productId}`);
+  static async adjustStock(productPublicId: string, data: InventoryAdjustRequest): Promise<ApiResponse<InventoryAdjustmentResult>> {
+    const response = await inventoryApi.post(`/v1/inventory/${productPublicId}/adjust`, data);
     return response.data;
   }
 
-  // 創建庫存
-  static async createInventory(data: InventoryCreateRequest): Promise<ApiResponse<Inventory>> {
-    const response = await inventoryApi.post('/v1/inventory', data);
+  static async getLowStockAlerts(threshold: number = 5): Promise<ApiResponse<InventoryItem[]>> {
+    const response = await inventoryApi.get('/v1/inventory/alerts', {
+      params: { threshold },
+    });
     return response.data;
   }
 
-  // 更新庫存
-  static async updateInventory(productId: string, data: InventoryUpdateRequest): Promise<ApiResponse<Inventory>> {
-    const response = await inventoryApi.put(`/v1/inventory/${productId}`, data);
+  static async getOutOfStockAlerts(): Promise<ApiResponse<InventoryItem[]>> {
+    const response = await this.getLowStockAlerts(0);
+
+    return {
+      ...response,
+      data: response.data.filter((item) => item.stock_quantity === 0),
+    };
+  }
+
+  static async getInventoryStats(): Promise<ApiResponse<InventoryStats>> {
+    const response = await inventoryApi.get('/v1/inventory/statistics');
     return response.data;
   }
 
-  // 批量更新庫存
-  static async bulkUpdateInventory(updates: Array<{ productId: string; quantity: number; type: string; reason: string; referenceId?: string }>): Promise<ApiResponse<any>> {
-      const response = await inventoryApi.post('/v1/inventory/bulk', { updates });
-      return response.data;
+  static async createInventory(): Promise<never> {
+    return Promise.reject(new Error('Inventory creation is not supported by the backend API.'));
   }
 
-  // 預留庫存
-  static async reserveStock(productId: string, data: StockReservationRequest): Promise<ApiResponse<any>> {
-    const response = await inventoryApi.post(`/v1/inventory/${productId}/reserve`, data);
-    return response.data;
+  static async updateInventory(): Promise<never> {
+    return Promise.reject(new Error('Inventory update is not supported by the backend API.'));
   }
 
-  // 釋放庫存
-  static async releaseStock(productId: string, data: { quantity: number; orderId: string }): Promise<ApiResponse<any>> {
-    const response = await inventoryApi.post(`/v1/inventory/${productId}/release`, data);
-    return response.data;
-  }
-
-  // 確認出庫
-  static async shipStock(productId: string, data: { quantity: number; orderId: string }): Promise<ApiResponse<any>> {
-      const response = await inventoryApi.post(`/v1/inventory/${productId}/ship`, data);
-      return response.data;
-  }
-
-  // 獲取庫存交易記錄
-  static async getInventoryTransactions(productId: string, params?: { page?: number; limit?: number; type?: string }): Promise<ApiResponse<PaginatedResponse<InventoryTransaction>>> {
-    const response = await inventoryApi.get(`/v1/inventory/${productId}/transactions`, { params });
-    return response.data;
-  }
-
-  // 獲取庫存統計
-  static async getInventoryStats(params?: { period?: string; startDate?: string; endDate?: string }): Promise<ApiResponse<InventoryStats>> {
-    const response = await inventoryApi.get('/v1/inventory/stats', { params });
-    return response.data;
-  }
-
-  // 獲取低庫存警告
-  static async getLowStockAlerts(params?: { threshold?: number }): Promise<ApiResponse<any>> {
-    const response = await inventoryApi.get('/v1/inventory/alerts', { params });
-    return response.data;
+  static async deleteInventory(): Promise<never> {
+    return Promise.reject(new Error('Inventory deletion is not supported by the backend API.'));
   }
 }
 

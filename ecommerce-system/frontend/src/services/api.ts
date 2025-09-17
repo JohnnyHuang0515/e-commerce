@@ -1,8 +1,10 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
-// API 基礎配置 - 直接連接到新的統一 Node.js API 服務
-const API_BASE_URL = 'http://localhost:3002/api';
-const API_TIMEOUT = 30000; // 增加到 30 秒
+import type { ApiResponse } from '../types/api';
+
+// API 基礎配置 - 透過環境變數取得，預設走相對路徑配合代理
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT || 30000);
 
 // 統一 API 路徑配置 - 對應新的後端 API 架構
 export const API_PATHS = {
@@ -113,6 +115,7 @@ export const logApi = createApiInstance(API_BASE_URL); // Base path is /api/v1/l
 export const notificationApi = createApiInstance(API_BASE_URL); // Base path is /api/v1/notifications
 export const utilityApi = createApiInstance(API_BASE_URL); // Base path is /api/v1/utility
 
+
 // 兼容舊版 Service 的別名 - 保持向後兼容
 export const permissionApi = authApi; // Permission management is in auth service
 export const paymentApi = orderApi; // Payment is part of order service
@@ -120,23 +123,6 @@ export const logisticsApi = orderApi; // Logistics is in order service
 export const imageApi = productApi; // Image upload is in product service
 export const inventoryApi = productApi; // Inventory is part of product service
 export const aiApi = recommendationApi; // AI services are in recommendation service
-
-// 通用 API 響應類型
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data: T;
-  message?: string;
-  error?: string;
-}
-
-// 分頁響應類型
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
 
 // Dashboard 圖表數據類型
 export interface DailySalesData {

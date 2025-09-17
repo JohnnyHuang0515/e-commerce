@@ -1,5 +1,6 @@
 // 統一錯誤處理中間件
 const { clickhouseClient } = require('../config/database');
+const config = require('../config/env');
 
 /**
  * 錯誤處理中間件
@@ -90,7 +91,7 @@ const errorHandler = (err, req, res, next) => {
   }
   
   // 在開發環境中返回詳細錯誤信息
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isDevelopment = config.nodeEnv === 'development';
   
   const errorResponse = {
     success: false,

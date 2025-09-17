@@ -1,5 +1,7 @@
 // RBAC 權限檢查中間件
-const { getUserPermissions } = require('../config/database');
+const { getUserPermissions } = require('../services/permissionService');
+const { postgresPool } = require('../config/database');
+const { getIdMapping } = require('../utils/idMapper');
 
 /**
  * 權限檢查中間件
@@ -239,8 +241,6 @@ const checkResourceOwner = (resourceType, ownerField = 'user_id') => {
       }
       
       // 查詢資源擁有者
-      const { postgresPool, getIdMapping } = require('../config/database');
-      
       // 如果是 public_id，先轉換為內部 ID
       let internalId = resourceId;
       if (resourceType !== 'users') {

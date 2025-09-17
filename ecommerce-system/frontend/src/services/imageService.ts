@@ -1,4 +1,5 @@
-import { imageApi, ApiResponse, PaginatedResponse } from './api';
+import { imageApi } from './api';
+import type { ApiResponse, PaginatedResponse } from '../types/api';
 
 // 圖片相關類型定義
 export interface Image {

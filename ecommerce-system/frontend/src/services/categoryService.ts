@@ -1,4 +1,5 @@
-import { categoryApi, ApiResponse } from './api';
+import { categoryApi } from './api';
+import type { ApiResponse } from '../types/api';
 
 // 分類相關類型定義
 export interface Category {

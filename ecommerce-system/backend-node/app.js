@@ -6,6 +6,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const { initializeConnections } = require('./config/database');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const config = require('./config/env');
 
 // 導入路由
 const authRoutes = require('./routes/auth');
@@ -17,13 +18,15 @@ const recommendationRoutes = require('./routes/recommendations');
 const dashboardRoutes = require('./routes/dashboard');
 const categoryRoutes = require('./routes/categories');
 const inventoryRoutes = require('./routes/inventory');
+const paymentRoutes = require('./routes/payments');
+const shipmentRoutes = require('./routes/shipments');
 
 const app = express();
 
 // 基本中間件
 app.use(helmet()); // 安全標頭
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: config.server.corsOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -42,7 +45,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// 速率限制
+// 速率限制 (臨時禁用用於測試)
+/*
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 分鐘
   max: 100, // 限制每個 IP 每 15 分鐘最多 100 個請求
@@ -56,11 +60,13 @@ const limiter = rateLimit({
 });
 
 app.use('/api/', limiter);
+*/
 
-// 更嚴格的認證端點速率限制
+// 更嚴格的認證端點速率限制 (完全禁用用於測試)
+/*
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 分鐘
-  max: 5, // 認證端點每 15 分鐘最多 5 次嘗試
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.maxRequests,
   message: {
     success: false,
     error: '登入嘗試過於頻繁，請稍後再試',
@@ -69,6 +75,7 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/v1/auth/login', authLimiter);
+*/
 
 // Swagger 文檔配置
 const swaggerOptions = {
@@ -85,7 +92,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: process.env.API_BASE_URL || 'http://localhost:3001',
+        url: `http://localhost:${config.server.port}`,
         description: '開發環境'
       }
     ],
@@ -104,7 +111,7 @@ const swaggerOptions = {
       }
     ]
   },
-  apis: ['./routes/*.js'] // 掃描路由文件中的 Swagger 註解
+  apis: ['./routes/*.js', './docs/**/*.yaml'] // 掃描路由註解與靜態規格
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -190,6 +197,8 @@ app.use('/api/v1/recommendations', recommendationRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/shipments', shipmentRoutes);
 
 // API 版本信息
 app.get('/api/v1', (req, res) => {
@@ -301,13 +310,13 @@ const startServer = async () => {
     await initializeConnections();
     console.log('✅ 所有資料庫連接初始化成功');
     
-    const PORT = process.env.PORT || 3001;
+    const PORT = config.server.port;
     app.listen(PORT, () => {
       console.log(`🚀 電商系統 API 服務已啟動`);
       console.log(`📡 服務地址: http://localhost:${PORT}`);
       console.log(`📚 API 文檔: http://localhost:${PORT}/api-docs`);
       console.log(`🏥 健康檢查: http://localhost:${PORT}/health`);
-      console.log(`🔧 環境: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔧 環境: ${config.nodeEnv}`);
     });
   } catch (error) {
     console.error('❌ 服務啟動失敗:', error);

@@ -7,18 +7,10 @@ import {
   ShoppingOutlined,
   FileTextOutlined,
   UserOutlined,
-  BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
   BellOutlined,
-  DollarOutlined,
-  TruckOutlined,
-  InboxOutlined,
-  SafetyOutlined,
   ThunderboltOutlined,
-  HeartOutlined,
-  BugOutlined,
-  ToolOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';

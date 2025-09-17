@@ -1,881 +1,212 @@
-import React, { useState } from 'react';
-import { 
-  Row, 
-  Col, 
-  Table, 
-  Button, 
-  Input, 
-  Select, 
-  Space, 
-  Tag, 
-  Image, 
-  Popconfirm, 
-  message,
-  Modal,
-  Tooltip,
-  Form,
-  InputNumber
-} from 'antd';
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  EyeOutlined,
-  ShoppingOutlined,
-  DollarOutlined,
-  InboxOutlined,
-  CheckCircleOutlined
-} from '@ant-design/icons';
+import React, { useMemo, useState } from 'react';
+import { Button, Card, Form, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import { ReloadOutlined, SearchOutlined, ShoppingOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+
 import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
-import ImageUpload from '../../components/common/ImageUpload';
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../../hooks/useApi';
-import { useCategories } from '../../hooks/useCategories';
-import { Image as ImageType } from '../../services/imageService';
+import { useProducts, useProductStats, type ProductListParams } from '../../hooks/useProducts';
+import type { ProductRecord, ProductStatus } from '../../services/productService';
 import './Products.less';
 
-const { Search } = Input;
 const { Option } = Select;
+const { Text } = Typography;
 
-interface ProductFormData {
-  name: string;
-  description: string;
-  price: number;
-  categoryId: string;
-  stock: number;
-  status: 'active' | 'inactive';
-  attributes?: Record<string, any>;
-  images?: string[];
+interface ProductFilterForm {
+  search?: string;
   category?: string;
-  brand?: string;
-  sku?: string;
+  status?: ProductStatus;
 }
 
+const statusLabels: Record<ProductStatus, { text: string; color: string }> = {
+  active: { text: '上架', color: 'green' },
+  inactive: { text: '下架', color: 'red' },
+};
+
 const Products: React.FC = () => {
-  const [searchParams, setSearchParams] = useState({
-    page: 1,
-    limit: 10,
-    search: '',
-    category: '',
-    status: '',
-    sortBy: 'createdAt',
-    sortOrder: 'desc' as 'asc' | 'desc',
-  });
-  
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [productImages, setProductImages] = useState<ImageType[]>([]);
-  const [form] = Form.useForm();
+  const [filters, setFilters] = useState<ProductListParams>({ page: 1, limit: 10 });
+  const [filterForm] = Form.useForm<ProductFilterForm>();
 
-  // API hooks
-  const { data: productsData, isLoading, refetch } = useProducts(searchParams);
-  const { data: categoriesData } = useCategories();
-  const createProductMutation = useCreateProduct();
-  const updateProductMutation = useUpdateProduct();
-  const deleteProductMutation = useDeleteProduct();
+  const { data: productsResponse, isLoading, refetch } = useProducts(filters);
+  const { data: statsResponse } = useProductStats();
 
-  // 處理產品數據，映射字段名稱
-  const rawProducts = productsData?.data?.items || [];
-  const products = rawProducts.map((product: any) => ({
-    ...product,
-    stock: product.stock_quantity || product.stock || 0,
-    category: product.category_name || product.category || '未分類',
-    createdAt: product.created_at || product.createdAt,
-    images: product.images || [],
-    // 轉換狀態：1=active, 0=inactive
-    status: product.status === 1 ? 'active' : product.status === 0 ? 'inactive' : product.status
-  }));
-  const total = productsData?.data?.total || 0;
-  const categories = categoriesData?.data || [];
+  const products = productsResponse?.data.items ?? [];
+  const pagination = productsResponse?.data;
+  const stats = statsResponse?.data;
 
-  // 表格列定義
-  const columns = [
-    {
-      title: '商品名稱',
-      dataIndex: 'name',
-      key: 'name',
-      ellipsis: true,
-      render: (text: string, record: any) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{text}</div>
-          <div style={{ fontSize: 12, color: '#666' }}>SKU: {record.sku}</div>
-        </div>
-      ),
-    },
-    {
-      title: '圖片',
-      dataIndex: 'images',
-      key: 'images',
-      width: 80,
-      render: (images: string[]) => (
-        <div className="product-images">
-          {images && images.length > 0 ? (
-            <Image
-              src={images[0]}
-              alt="商品圖片"
-              width={40}
-              height={40}
-              style={{ objectFit: 'cover', borderRadius: 4 }}
-              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgeHANwDrkl1AuO+pmgAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAwqADAAQAAAABAAAAwwAAAAD9b/HnAAAHlklEQVR4Ae3dP3Ik1RnG4W+FgYxN"
-            />
-          ) : (
-            <div style={{ 
-              width: 40, 
-              height: 40, 
-              backgroundColor: 'rgba(45, 45, 45, 0.8)', 
-              borderRadius: 4,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              color: '#999',
-              border: '1px solid #404040'
-            }}>
-              無圖
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: '分類',
-      dataIndex: 'category',
-      key: 'category',
-      width: 100,
-      render: (category: string) => (
-        <Tag 
-          style={{ 
-            backgroundColor: 'rgba(24, 144, 255, 0.2)',
-            borderColor: '#1890ff',
-            color: '#1890ff'
-          }}
-        >
-          {category}
-        </Tag>
-      ),
-    },
-    {
-      title: '品牌',
-      dataIndex: 'brand',
-      key: 'brand',
-      width: 100,
-    },
-    {
-      title: '價格',
-      dataIndex: 'price',
-      key: 'price',
-      width: 120,
-      render: (price: number, record: any) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{price}</div>
-          {record.originalPrice && record.originalPrice > price && (
-            <div style={{ fontSize: 12, color: '#999', textDecoration: 'line-through' }}>
-              {record.originalPrice}
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: '庫存',
-      dataIndex: 'stock',
-      key: 'stock',
-      width: 80,
-      render: (stock: number) => (
-        <Tag 
-          color={stock > 10 ? 'green' : stock > 0 ? 'orange' : 'red'}
-          style={{ 
-            backgroundColor: stock > 10 ? 'rgba(82, 196, 26, 0.2)' : 
-                           stock > 0 ? 'rgba(250, 173, 20, 0.2)' : 
-                           'rgba(255, 77, 79, 0.2)',
-            borderColor: stock > 10 ? '#52c41a' : 
-                        stock > 0 ? '#faad14' : 
-                        '#ff4d4f',
-            color: stock > 10 ? '#52c41a' : 
-                   stock > 0 ? '#faad14' : 
-                   '#ff4d4f'
-          }}
-        >
-          {stock}
-        </Tag>
-      ),
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => {
-        const statusConfig = {
-          active: { color: '#52c41a', bgColor: 'rgba(82, 196, 26, 0.2)', text: '上架' },
-          inactive: { color: '#ff4d4f', bgColor: 'rgba(255, 77, 79, 0.2)', text: '下架' },
-          draft: { color: '#faad14', bgColor: 'rgba(250, 173, 20, 0.2)', text: '草稿' },
-        };
-        const config = statusConfig[status as keyof typeof statusConfig];
-        if (!config) {
-          return (
-            <Tag style={{ 
-              backgroundColor: 'rgba(45, 45, 45, 0.8)',
-              borderColor: '#404040',
-              color: '#fff'
-            }}>
-              {status || '未知狀態'}
-            </Tag>
-          );
-        }
-        return (
-          <Tag 
-            style={{ 
-              backgroundColor: config.bgColor,
-              borderColor: config.color,
-              color: config.color
-            }}
-          >
-            {config.text}
-          </Tag>
-        );
+  const columns: ColumnsType<ProductRecord> = useMemo(
+    () => [
+      {
+        title: '商品名稱',
+        dataIndex: 'name',
+        key: 'name',
+        render: (value: string, record) => (
+          <Space direction="vertical" size={0}>
+            <Text strong>{value}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              SKU：{record.sku}
+            </Text>
+          </Space>
+        ),
       },
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 120,
-      render: (date: string) => new Date(date).toLocaleDateString(),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 150,
-      render: (_: any, record: any) => (
-        <Space size="small">
-          <Tooltip title="查看詳情">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              size="small"
-              onClick={() => handleView(record)}
-              style={{ color: '#fff' }}
-            />
-          </Tooltip>
-          <Tooltip title="編輯商品">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              size="small"
-              onClick={() => handleEdit(record)}
-              style={{ color: '#fff' }}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="確定要刪除這個商品嗎？"
-            onConfirm={() => handleDelete(record.public_id)}
-            okText="確定"
-            cancelText="取消"
-          >
-            <Tooltip title="刪除商品">
-              <Button
-                type="text"
-                icon={<DeleteOutlined />}
-                size="small"
-                danger
-                style={{ color: '#ff4d4f' }}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
-  // 處理函數
-  const handleSearch = (value: string) => {
-    setSearchParams(prev => ({ ...prev, search: value, page: 1 }));
-  };
-
-  const handleCategoryChange = (value: string) => {
-    setSearchParams(prev => ({ ...prev, category: value, page: 1 }));
-  };
-
-  const handleStatusChange = (value: string) => {
-    setSearchParams(prev => ({ ...prev, status: value, page: 1 }));
-  };
-
-  const handleTableChange = (pagination: any, _filters: any, sorter: any) => {
-    setSearchParams(prev => ({
-      ...prev,
-      page: pagination.current,
-      limit: pagination.pageSize,
-      sortBy: sorter.field || 'createdAt',
-      sortOrder: sorter.order === 'ascend' ? 'asc' : 'desc',
-    }));
-  };
-
-  const handleAdd = () => {
-    setEditingProduct(null);
-    form.resetFields();
-    setModalVisible(true);
-  };
-
-  const handleEdit = (product: any) => {
-    setEditingProduct(product);
-    
-    // 找到對應的分類 ID
-    const categoryId = categories.find(cat => cat.name === product.category)?._id;
-    
-    form.setFieldsValue({
-      ...product,
-      tags: product.tags?.join(',') || '',
-      categoryId: categoryId || product.categoryId || product.category,
-    });
-    setModalVisible(true);
-  };
-
-  const handleView = (product: any) => {
-    Modal.info({
-      title: (
-        <div style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>
-          商品詳情
-        </div>
-      ),
-      width: 700,
-      className: 'dark-modal',
-      styles: {
-        body: {
-          backgroundColor: '#1f1f1f',
-          color: '#fff'
-        },
-        header: {
-          backgroundColor: '#2d2d2d',
-          borderBottom: '1px solid #404040',
-          color: '#fff'
-        },
-        mask: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)'
-        },
-        content: {
-          backgroundColor: '#1f1f1f',
-          border: '1px solid #404040',
-          borderRadius: '8px'
-        }
+      {
+        title: '分類',
+        dataIndex: 'category',
+        key: 'category',
+        width: 160,
+        render: (value?: string) => (value ? <Tag color="blue">{value}</Tag> : '—'),
       },
-      content: (
-        <div style={{ color: '#fff' }}>
-          {/* 商品圖片區域 */}
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            {product.images && product.images.length > 0 ? (
-              <Image
-                src={product.images[0]}
-                alt="商品圖片"
-                width={200}
-                height={200}
-                style={{ 
-                  objectFit: 'cover', 
-                  borderRadius: 8,
-                  border: '2px solid #404040'
-                }}
-                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgeHANwDrkl1AuO+pmgAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAwqADAAQAAAABAAAAwwAAAAD9b/HnAAAHlklEQVR4Ae3dP3Ik1RnG4W+FgYxN"
-              />
-            ) : (
-              <div style={{ 
-                width: 200, 
-                height: 200, 
-                backgroundColor: 'rgba(45, 45, 45, 0.8)', 
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16,
-                color: '#999',
-                border: '2px solid #404040',
-                margin: '0 auto'
-              }}>
-                無商品圖片
-              </div>
-            )}
-          </div>
+      {
+        title: '價格',
+        dataIndex: 'price',
+        key: 'price',
+        width: 120,
+        render: (price: number) => <Text strong>NT$ {price.toLocaleString()}</Text>,
+      },
+      {
+        title: '庫存',
+        dataIndex: 'stock',
+        key: 'stock',
+        width: 120,
+        render: (stock: number) => {
+          const color = stock === 0 ? 'red' : stock < 10 ? 'orange' : 'green';
+          return <Tag color={color}>{stock}</Tag>;
+        },
+      },
+      {
+        title: '狀態',
+        dataIndex: 'status',
+        key: 'status',
+        width: 120,
+        render: (status: ProductStatus) => (
+          <Tag color={statusLabels[status].color}>{statusLabels[status].text}</Tag>
+        ),
+      },
+      {
+        title: '建立時間',
+        dataIndex: 'createdAt',
+        key: 'createdAt',
+        width: 180,
+        render: (value: string) => new Date(value).toLocaleString(),
+      },
+      {
+        title: '更新時間',
+        dataIndex: 'updatedAt',
+        key: 'updatedAt',
+        width: 180,
+        render: (value: string) => new Date(value).toLocaleString(),
+      },
+    ],
+    []
+  );
 
-          {/* 商品基本信息 */}
-          <div style={{ marginBottom: 24 }}>
-            <h3 style={{ color: '#fff', marginBottom: 16, fontSize: '16px', fontWeight: 'bold' }}>
-              📋 商品信息
-            </h3>
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>商品名稱</div>
-                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.name}</div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>SKU</div>
-                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.sku}</div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>分類</div>
-                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.category}</div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>品牌</div>
-                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{product.brand || '未設定'}</div>
-                </div>
-              </Col>
-            </Row>
-          </div>
-
-          {/* 價格和庫存信息 */}
-          <div style={{ marginBottom: 24 }}>
-            <h3 style={{ color: '#fff', marginBottom: 16, fontSize: '16px', fontWeight: 'bold' }}>
-              💰 價格與庫存
-            </h3>
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(24, 144, 255, 0.1)',
-                  padding: 20,
-                  borderRadius: 8,
-                  border: '2px solid #1890ff',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ color: '#1890ff', fontSize: 12, marginBottom: 8 }}>💰 商品價格</div>
-                  <div style={{ color: '#1890ff', fontSize: 24, fontWeight: 'bold' }}>${product.price}</div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: product.stock > 10 ? 'rgba(82, 196, 26, 0.1)' : 
-                                 product.stock > 0 ? 'rgba(250, 173, 20, 0.1)' : 
-                                 'rgba(255, 77, 79, 0.1)',
-                  padding: 20,
-                  borderRadius: 8,
-                  border: `2px solid ${product.stock > 10 ? '#52c41a' : 
-                                          product.stock > 0 ? '#faad14' : 
-                                          '#ff4d4f'}`,
-                  textAlign: 'center'
-                }}>
-                  <div style={{ 
-                    color: product.stock > 10 ? '#52c41a' : 
-                           product.stock > 0 ? '#faad14' : 
-                           '#ff4d4f', 
-                    fontSize: 12, 
-                    marginBottom: 8 
-                  }}>
-                    📦 當前庫存
-                  </div>
-                  <div style={{ 
-                    color: product.stock > 10 ? '#52c41a' : 
-                           product.stock > 0 ? '#faad14' : 
-                           '#ff4d4f', 
-                    fontSize: 24, 
-                    fontWeight: 'bold' 
-                  }}>
-                    {product.stock}
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </div>
-
-          {/* 其他信息 */}
-          <div>
-            <h3 style={{ color: '#fff', marginBottom: 16, fontSize: '16px', fontWeight: 'bold' }}>
-              ℹ️ 其他信息
-            </h3>
-            <Row gutter={[16, 16]}>
-              <Col span={24}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>商品描述</div>
-                  <div style={{ color: '#fff', fontSize: 14, lineHeight: 1.5 }}>
-                    {product.description || '暫無描述'}
-                  </div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>商品狀態</div>
-                  <Tag 
-                    style={{ 
-                      backgroundColor: product.status === 'active' ? 'rgba(82, 196, 26, 0.2)' : 
-                                       product.status === 'inactive' ? 'rgba(255, 77, 79, 0.2)' : 
-                                       'rgba(250, 173, 20, 0.2)',
-                      borderColor: product.status === 'active' ? '#52c41a' : 
-                                  product.status === 'inactive' ? '#ff4d4f' : 
-                                  '#faad14',
-                      color: product.status === 'active' ? '#52c41a' : 
-                             product.status === 'inactive' ? '#ff4d4f' : 
-                             '#faad14'
-                    }}
-                  >
-                    {product.status === 'active' ? '上架' : 
-                     product.status === 'inactive' ? '下架' : 
-                     product.status === 'draft' ? '草稿' : product.status}
-                  </Tag>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ 
-                  backgroundColor: 'rgba(45, 45, 45, 0.8)',
-                  padding: 16,
-                  borderRadius: 8,
-                  border: '1px solid #404040',
-                  marginBottom: 12
-                }}>
-                  <div style={{ color: '#b0b0b0', fontSize: 12, marginBottom: 4 }}>創建時間</div>
-                  <div style={{ color: '#fff', fontSize: 14 }}>
-                    {product.createdAt ? new Date(product.createdAt).toLocaleString() : '未知'}
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </div>
-      ),
-    });
-  };
-
-  const handleDelete = async (productId: string) => {
-    try {
-      await deleteProductMutation.mutateAsync(productId);
-      message.success('商品刪除成功');
-      refetch();
-    } catch (error: any) {
-      message.error(error.message || '刪除失敗');
-    }
-  };
-
-  const handleSubmit = async (values: ProductFormData) => {
-    try {
-      // 提取圖片 URL
-      const imageUrls = productImages.map(img => img.url);
-      
-      // 找到選中的分類
-      const selectedCategory = categories.find(cat => cat._id === values.categoryId);
-      
-      const productData = {
-        ...values,
-        attributes: values.attributes || {},
-        images: imageUrls,
-        category: selectedCategory?.name || '未分類',
-        brand: values.brand || 'Default Brand',
-        sku: `SKU-${Date.now()}`,
-      };
-
-      if (editingProduct) {
-        // 使用 public_id 作為商品 ID
-        const productId = editingProduct.public_id;
-        if (!productId) {
-          message.error('商品 ID 不存在');
-          return;
-        }
-        await updateProductMutation.mutateAsync({ id: productId, ...productData });
-        message.success('商品更新成功');
-      } else {
-        await createProductMutation.mutateAsync(productData);
-        message.success('商品創建成功');
-      }
-
-      setModalVisible(false);
-      form.resetFields();
-      setProductImages([]);
-      refetch();
-    } catch (error: any) {
-      message.error(error.message || '操作失敗');
-    }
-  };
-
-  // 統計數據配置
   const statsConfig = [
     {
-      label: '總商品',
-      value: total,
+      label: '商品總數',
+      value: stats?.total ?? products.length,
       icon: <ShoppingOutlined />,
-      color: 'var(--text-primary)'
+      color: 'var(--primary-500)',
     },
     {
-      label: '上架商品',
-      value: products.filter(p => p.status === 'active').length,
-      icon: <CheckCircleOutlined />,
-      color: 'var(--success-500)'
+      label: '已上架',
+      value: stats?.active ?? products.filter((item) => item.status === 'active').length,
+      icon: <ShoppingOutlined />,
+      color: 'var(--success-500)',
     },
     {
-      label: '庫存不足',
-      value: products.filter(p => p.stock < 10).length,
-      icon: <InboxOutlined />,
-      color: 'var(--warning-500)'
+      label: '下架中',
+      value: stats?.inactive ?? products.filter((item) => item.status === 'inactive').length,
+      icon: <ShoppingOutlined />,
+      color: 'var(--warning-500)',
     },
     {
-      label: '平均價格',
-      value: products.length > 0 ? `$${(products.reduce((sum, p) => sum + Number(p.price), 0) / products.length).toFixed(2)}` : '$0.00',
-      icon: <DollarOutlined />,
-      color: 'var(--info-500)'
-    }
+      label: '庫存偏低',
+      value: stats?.lowStock ?? products.filter((item) => item.stock > 0 && item.stock < 10).length,
+      icon: <ShoppingOutlined />,
+      color: 'var(--error-500)',
+    },
   ];
 
-  // 篩選區域
-  const filtersContent = (
-    <Row gutter={[16, 16]} align="middle">
-      <Col xs={24} sm={12} md={8}>
-        <Input.Search
-          placeholder="搜索商品名稱或SKU"
-          allowClear
-          onSearch={handleSearch}
-          style={{ width: '100%' }}
-        />
-      </Col>
-      <Col xs={24} sm={6} md={4}>
-        <Select
-          placeholder="選擇分類"
-          allowClear
-          style={{ width: '100%' }}
-          onChange={handleCategoryChange}
-        >
-          {categories.map((category) => (
-            <Option key={category._id || category.category_id} value={category._id || category.category_id}>
-              {category.name}
-            </Option>
-          ))}
-        </Select>
-      </Col>
-      <Col xs={24} sm={6} md={4}>
-        <Select
-          placeholder="選擇狀態"
-          allowClear
-          style={{ width: '100%' }}
-          onChange={handleStatusChange}
-        >
-          <Option key="active" value="active">上架</Option>
-          <Option key="inactive" value="inactive">下架</Option>
-          <Option key="draft" value="draft">草稿</Option>
-        </Select>
-      </Col>
-    </Row>
-  );
+  function handleFilterSubmit(values: ProductFilterForm) {
+    setFilters((prev) => ({
+      ...prev,
+      page: 1,
+      search: values.search?.trim() || undefined,
+      category: values.category || undefined,
+      status: values.status || undefined,
+    }));
+  }
 
-  // 操作按鈕
-  const extraActions = (
-    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-      新增商品
-    </Button>
-  );
+  function handleTableChange(page: number, pageSize?: number) {
+    setFilters((prev) => ({
+      ...prev,
+      page,
+      limit: pageSize ?? prev.limit,
+    }));
+  }
 
   return (
     <UnifiedPageLayout
       title="商品列表"
-      subtitle="查看和管理商品信息、庫存和狀態"
-      extra={extraActions}
+      subtitle="管理與檢視商品資訊"
       stats={statsConfig}
-      filters={filtersContent}
-      onRefresh={() => refetch()}
       loading={isLoading}
-    >
-      {/* 商品表格 */}
-      <Table
-        columns={columns}
-        dataSource={products}
-        loading={isLoading}
-        rowKey="public_id"
-        pagination={{
-          current: searchParams.page,
-          pageSize: searchParams.limit,
-          total: total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 條，共 ${total} 條`,
-        }}
-        onChange={handleTableChange}
-        scroll={{ x: 1000 }}
-      />
-
-      {/* 新增/編輯商品彈窗 */}
-      <Modal
-        title={editingProduct ? '編輯商品' : '新增商品'}
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={null}
-        width={600}
-        className="dark-modal"
-        styles={{
-          body: {
-            backgroundColor: '#1f1f1f',
-            color: '#fff'
-          },
-          header: {
-            backgroundColor: '#2d2d2d',
-            borderBottom: '1px solid #404040',
-            color: '#fff'
-          },
-          mask: {
-            backgroundColor: 'rgba(0, 0, 0, 0.8)'
-          },
-          content: {
-            backgroundColor: '#1f1f1f',
-            border: '1px solid #404040',
-            borderRadius: '8px'
-          }
-        }}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          className="dark-form"
+      extra={
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
+            重新整理
+          </Button>
+        </Space>
+      }
+      filters={
+        <Form<ProductFilterForm>
+          layout="inline"
+          form={filterForm}
+          onFinish={handleFilterSubmit}
+          style={{ display: 'flex', gap: 12 }}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="name"
-                label="商品名稱"
-                rules={[{ required: true, message: '請輸入商品名稱' }]}
-              >
-                <Input placeholder="請輸入商品名稱" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="stock"
-                label="庫存"
-                rules={[{ required: true, message: '請輸入庫存' }]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="庫存"
-                  min={0}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            name="description"
-            label="商品描述"
-            rules={[{ required: true, message: '請輸入商品描述' }]}
-          >
-            <Input.TextArea rows={3} placeholder="請輸入商品描述" />
+          <Form.Item name="search">
+            <Input placeholder="搜尋名稱或 SKU" allowClear style={{ width: 200 }} />
           </Form.Item>
-
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="price"
-                label="售價"
-                rules={[{ required: true, message: '請輸入售價' }]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="售價"
-                  min={0}
-                  precision={2}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="originalPrice" label="原價">
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="原價"
-                  min={0}
-                  precision={2}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="brand" label="品牌">
-                <Input placeholder="品牌" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="categoryId"
-                label="分類"
-                rules={[{ required: true, message: '請選擇分類' }]}
-              >
-                <Select placeholder="請選擇分類">
-                  {categories.map((category) => (
-                    <Option key={category._id || category.category_id} value={category._id || category.category_id}>
-                      {category.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            name="status"
-            label="狀態"
-            rules={[{ required: true, message: '請選擇狀態' }]}
-          >
-            <Select placeholder="請選擇狀態">
-              <Option key="active" value="active">上架</Option>
-              <Option key="inactive" value="inactive">下架</Option>
+          <Form.Item name="category">
+            <Select placeholder="分類" allowClear style={{ width: 160 }}>
+              <Option value="音訊設備">音訊設備</Option>
+              <Option value="穿戴裝置">穿戴裝置</Option>
+              <Option value="充電配件">充電配件</Option>
             </Select>
           </Form.Item>
-
-          <Form.Item label="商品圖片">
-            <ImageUpload
-              entityType="product"
-              entityId={editingProduct?.public_id || 'new'}
-              images={productImages}
-              maxCount={5}
-              onChange={setProductImages}
-            />
+          <Form.Item name="status">
+            <Select placeholder="狀態" allowClear style={{ width: 160 }}>
+              {Object.entries(statusLabels).map(([value, config]) => (
+                <Option key={value} value={value}>
+                  {config.text}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
-
           <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={createProductMutation.isPending || updateProductMutation.isPending}>
-                {editingProduct ? '更新' : '創建'}
-              </Button>
-              <Button onClick={() => setModalVisible(false)}>
-                取消
-              </Button>
-            </Space>
+            <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+              篩選
+            </Button>
           </Form.Item>
         </Form>
-      </Modal>
+      }
+    >
+      <Card bordered={false}>
+        <Table<ProductRecord>
+          rowKey={(record) => record.id}
+          columns={columns}
+          dataSource={products}
+          loading={isLoading}
+          pagination={{
+            total: pagination?.total ?? products.length,
+            pageSize: pagination?.limit ?? filters.limit ?? 10,
+            current: pagination?.page ?? filters.page ?? 1,
+            onChange: handleTableChange,
+            showSizeChanger: true,
+            showQuickJumper: true,
+          }}
+        />
+      </Card>
     </UnifiedPageLayout>
   );
 };

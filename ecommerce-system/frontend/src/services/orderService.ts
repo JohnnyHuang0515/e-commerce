@@ -1,84 +1,36 @@
-import { orderApi, ApiResponse, PaginatedResponse } from './api';
+import { orderApi } from './api';
+
+import { ApiResponse, PaginatedResponse, OrderSummary, OrderDetail, OrderItemSummary } from '../types/api';
 
 // 訂單相關類型定義
-export interface Order {
-  id: string;
-  orderNumber: string;
-  userId: string;
-  items: OrderItem[];
-  subtotal: number;
-  tax: number;
-  shippingCost: number;
-  discount: number;
-  total: number;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
-  payment: {
-    method: string;
-    status: 'pending' | 'paid' | 'failed' | 'refunded';
-    transactionId?: string;
-    paidAt?: string;
-  };
-  shipping: {
-    method: string;
-    address: {
-      name: string;
-      phone: string;
-      address: string;
-      city: string;
-      postalCode: string;
-      country: string;
-    };
-    trackingNumber?: string;
-    estimatedDelivery?: string;
-  };
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type Order = OrderDetail;
 
-export interface OrderItem {
-  productId: string;
-  productName: string;
-  productImage?: string;
-  sku: string;
-  quantity: number;
-  price: number;
-  total: number;
-}
+export type OrderItem = OrderItemSummary;
 
 export interface OrderCreateRequest {
-  userId: string;
+  user_id: string;
   items: Array<{
-    productId: string;
+    product_id: string;
     quantity: number;
   }>;
-  shipping: {
-    method: string;
-    address: {
-      name: string;
-      phone: string;
-      address: string;
-      city: string;
-      postalCode: string;
-      country: string;
-    };
+  shipping_method?: string;
+  shipping_address?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    postal_code?: string;
+    country?: string;
   };
-  payment: {
-    method: string;
-  };
+  payment_method?: string;
   notes?: string;
 }
 
 export interface OrderUpdateRequest {
   status?: string;
-  payment?: {
-    status: string;
-    transactionId?: string;
-  };
-  shipping?: {
-    trackingNumber?: string;
-    estimatedDelivery?: string;
-  };
+  payment_status?: string;
+  tracking_number?: string;
+  estimated_delivery?: string;
   notes?: string;
 }
 
@@ -87,11 +39,11 @@ export interface OrderSearchParams {
   limit?: number;
   search?: string;
   status?: string;
-  userId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  minAmount?: number;
-  maxAmount?: number;
+  user_id?: string;
+  date_from?: string;
+  date_to?: string;
+  min_amount?: number;
+  max_amount?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -112,7 +64,7 @@ export interface OrderStats {
 // 訂單 API 服務類
 export class OrderService {
   // 獲取訂單列表
-  static async getOrders(params?: OrderSearchParams): Promise<ApiResponse<PaginatedResponse<Order>>> {
+  static async getOrders(params?: OrderSearchParams): Promise<PaginatedResponse<OrderSummary>> {
     try {
       const response = await orderApi.get('/v1/orders', { params });
       return response.data;
@@ -123,7 +75,7 @@ export class OrderService {
   }
 
   // 獲取訂單詳情
-  static async getOrder(orderId: string): Promise<ApiResponse<Order>> {
+  static async getOrder(orderId: string): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.get(`/v1/orders/${orderId}`);
       return response.data;
@@ -134,7 +86,7 @@ export class OrderService {
   }
 
   // 創建訂單
-  static async createOrder(orderData: OrderCreateRequest): Promise<ApiResponse<Order>> {
+  static async createOrder(orderData: OrderCreateRequest): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.post('/v1/orders', orderData);
       return response.data;
@@ -145,7 +97,7 @@ export class OrderService {
   }
 
   // 更新訂單
-  static async updateOrder(orderId: string, orderData: OrderUpdateRequest): Promise<ApiResponse<Order>> {
+  static async updateOrder(orderId: string, orderData: OrderUpdateRequest): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.put(`/v1/orders/${orderId}`, orderData);
       return response.data;
@@ -156,7 +108,7 @@ export class OrderService {
   }
 
   // 取消訂單
-  static async cancelOrder(orderId: string, reason?: string): Promise<ApiResponse<Order>> {
+  static async cancelOrder(orderId: string, reason?: string): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.put(`/v1/orders/${orderId}/cancel`, { reason });
       return response.data;
@@ -167,7 +119,7 @@ export class OrderService {
   }
 
   // 確認訂單
-  static async confirmOrder(orderId: string): Promise<ApiResponse<Order>> {
+  static async confirmOrder(orderId: string): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.put(`/v1/orders/${orderId}/confirm`);
       return response.data;
@@ -178,9 +130,9 @@ export class OrderService {
   }
 
   // 發貨
-  static async shipOrder(orderId: string, trackingNumber: string): Promise<ApiResponse<Order>> {
+  static async shipOrder(orderId: string, trackingNumber: string): Promise<ApiResponse<OrderDetail>> {
     try {
-      const response = await orderApi.put(`/v1/orders/${orderId}/ship`, { trackingNumber });
+      const response = await orderApi.put(`/v1/orders/${orderId}/ship`, { tracking_number: trackingNumber });
       return response.data;
     } catch (error) {
       console.error('發貨失敗:', error);
@@ -189,7 +141,7 @@ export class OrderService {
   }
 
   // 完成訂單
-  static async completeOrder(orderId: string): Promise<ApiResponse<Order>> {
+  static async completeOrder(orderId: string): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.put(`/v1/orders/${orderId}/complete`);
       return response.data;
@@ -200,7 +152,7 @@ export class OrderService {
   }
 
   // 退貨
-  static async returnOrder(orderId: string, reason: string): Promise<ApiResponse<Order>> {
+  static async returnOrder(orderId: string, reason: string): Promise<ApiResponse<OrderDetail>> {
     try {
       const response = await orderApi.put(`/v1/orders/${orderId}/return`, { reason });
       return response.data;
@@ -223,7 +175,7 @@ export class OrderService {
 
   // 獲取訂單概覽
   static async getOrderOverview(): Promise<ApiResponse<{
-    recentOrders: Order[];
+    recentOrders: OrderDetail[];
     pendingOrders: number;
     totalRevenue: number;
     orderTrend: Array<{

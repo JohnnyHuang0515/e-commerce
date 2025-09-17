@@ -26,14 +26,12 @@ import {
   ShoppingOutlined,
   DollarOutlined,
   ClockCircleOutlined,
-  CheckCircleOutlined
 } from '@ant-design/icons';
 import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
 import { useOrders, useCreateOrder, useUpdateOrder, useOrderStats } from '../../hooks/useApi';
 import OrderService from '../../services/orderService';
 import './Orders.less';
 
-const { Search } = Input;
 const { Option } = Select;
 
 const Orders: React.FC = () => {

@@ -1,9 +1,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { 
-  postgresPool, 
-  authenticateToken
-} = require('../config/database');
+const { postgresPool } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { asyncHandler, ValidationError, NotFoundError } = require('../middleware/errorHandler');
 

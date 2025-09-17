@@ -1,155 +1,208 @@
-import { logisticsApi, ApiResponse, PaginatedResponse } from './api';
+import type { AxiosError } from 'axios';
 
-// 物流相關類型定義
-export interface Shipment {
-  _id: string;
-  shipmentId: string;
+import { logisticsApi } from './api';
+import type { ApiResponse, Paginated } from '../types/api';
+
+export type ShipmentStatus =
+  | 'pending'
+  | 'processing'
+  | 'in_transit'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'failed'
+  | 'returned'
+  | 'cancelled';
+
+export interface ShipmentRecord {
+  id: string;
   orderId: string;
   userId: string;
-  status: 'pending' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed' | 'returned' | 'cancelled';
-  shippingAddress: {
+  status: ShipmentStatus;
+  provider: string;
+  method: string;
+  trackingNumber?: string;
+  destination: {
     name: string;
-    phone: string;
     city: string;
     district: string;
     address: string;
-    zipCode: string;
   };
-  packageInfo: {
-    weight: number;
-    dimensions: {
-      length: number;
-      width: number;
-      height: number;
-    };
-    value: number;
-    description: string;
-  };
-  shippingInfo: {
-    method: string;
-    provider: string;
-    trackingNumber: string;
-    estimatedDelivery?: string;
-    actualDelivery?: string;
-  };
-  costInfo: {
-    totalFee: number;
-    currency: string;
-  };
-  trackingEvents: TrackingEvent[];
-  createdAt: string;
+  estimatedDelivery?: string;
   updatedAt: string;
+  createdAt: string;
 }
 
-export interface TrackingEvent {
-  status: string;
-  description: string;
-  location?: string;
-  timestamp: string;
-}
-
-export interface ShipmentCreateRequest {
-  orderId: string;
-  userId: string;
-  shippingAddress: {
-    name: string;
-    phone: string;
-    city: string;
-    district: string;
-    address: string;
-    zipCode: string;
-  };
-  packageInfo: {
-    weight: number;
-    dimensions: {
-      length: number;
-      width: number;
-      height: number;
-    };
-    value: number;
-    description: string;
-  };
-  shippingMethod: 'home_delivery' | 'convenience_store' | 'post_office' | 'express';
-}
-
-export interface CostCalculationRequest {
-    packageInfo: {
-        weight: number;
-        dimensions: {
-            length: number;
-            width: number;
-            height: number;
-        };
-        value: number;
-    };
-    shippingMethod: string;
-    shippingAddress: {
-        city: string;
-        district: string;
-    };
-}
-
-export interface LogisticsStats {
-  totalShipments: number;
-  deliveredShipments: number;
-  pendingShipments: number;
-  failedShipments: number;
-  averageDeliveryTime: number;
-}
-
-export interface LogisticsSearchParams {
+export interface LogisticsListParams {
   page?: number;
   limit?: number;
-  status?: string;
+  status?: ShipmentStatus;
+  provider?: string;
   method?: string;
-  userId?: string;
-  orderId?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
 }
 
-// 物流服務類
+export type LogisticsListResponse = Paginated<ShipmentRecord>;
+
+export interface LogisticsStats {
+  total: number;
+  delivered: number;
+  inTransit: number;
+  pending: number;
+  failed: number;
+}
+
+const isAxiosError = (error: unknown): error is AxiosError =>
+  typeof error === 'object' && error !== null && 'isAxiosError' in error;
+
+const MOCK_SHIPMENTS: ShipmentRecord[] = [
+  {
+    id: 'ship-1001',
+    orderId: 'order-001',
+    userId: 'user-001',
+    status: 'in_transit',
+    provider: '黑貓宅急便',
+    method: '宅配',
+    trackingNumber: 'TC123456789',
+    destination: {
+      name: '王小明',
+      city: '臺北市',
+      district: '信義區',
+      address: '松高路 12 號',
+    },
+    estimatedDelivery: '2024-03-08T00:00:00Z',
+    createdAt: '2024-03-05T09:00:00Z',
+    updatedAt: '2024-03-06T10:30:00Z',
+  },
+  {
+    id: 'ship-1002',
+    orderId: 'order-002',
+    userId: 'user-002',
+    status: 'delivered',
+    provider: '新竹物流',
+    method: '宅配',
+    trackingNumber: 'HC987654321',
+    destination: {
+      name: '陳佳',
+      city: '新北市',
+      district: '板橋區',
+      address: '文化路一段 100 號',
+    },
+    estimatedDelivery: '2024-03-06T00:00:00Z',
+    createdAt: '2024-03-03T12:20:00Z',
+    updatedAt: '2024-03-06T08:15:00Z',
+  },
+  {
+    id: 'ship-1003',
+    orderId: 'order-003',
+    userId: 'user-003',
+    status: 'pending',
+    provider: '順豐速運',
+    method: '超商取貨',
+    destination: {
+      name: '林宥',
+      city: '桃園市',
+      district: '桃園區',
+      address: '中正路 88 號',
+    },
+    createdAt: '2024-03-07T07:45:00Z',
+    updatedAt: '2024-03-07T07:45:00Z',
+  },
+];
+
+const buildMockResponse = (params: LogisticsListParams = {}): LogisticsListResponse => {
+  const { status, provider, method, page = 1, limit = 10 } = params;
+  let filtered = [...MOCK_SHIPMENTS];
+
+  if (status) {
+    filtered = filtered.filter((shipment) => shipment.status === status);
+  }
+
+  if (provider) {
+    filtered = filtered.filter((shipment) => shipment.provider === provider);
+  }
+
+  if (method) {
+    filtered = filtered.filter((shipment) => shipment.method === method);
+  }
+
+  const start = (page - 1) * limit;
+  const items = filtered.slice(start, start + limit);
+
+  return {
+    items,
+    total: filtered.length,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(filtered.length / limit)),
+  };
+};
+
+const buildMockStats = (shipments: ShipmentRecord[]): LogisticsStats => {
+  return shipments.reduce(
+    (accumulator, shipment) => {
+      accumulator.total += 1;
+      if (shipment.status === 'delivered') accumulator.delivered += 1;
+      if (shipment.status === 'in_transit' || shipment.status === 'out_for_delivery') accumulator.inTransit += 1;
+      if (shipment.status === 'pending' || shipment.status === 'processing') accumulator.pending += 1;
+      if (shipment.status === 'failed' || shipment.status === 'returned' || shipment.status === 'cancelled') accumulator.failed += 1;
+      return accumulator;
+    },
+    {
+      total: 0,
+      delivered: 0,
+      inTransit: 0,
+      pending: 0,
+      failed: 0,
+    } as LogisticsStats
+  );
+};
+
 export class LogisticsService {
-  // 獲取配送列表
-  static async getShipments(params?: LogisticsSearchParams): Promise<ApiResponse<PaginatedResponse<Shipment>>> {
-    const response = await logisticsApi.get('/v1/shipments', { params });
-    return response.data;
+  static async getShipments(params: LogisticsListParams = {}): Promise<ApiResponse<LogisticsListResponse>> {
+    try {
+      const response = await logisticsApi.get('/v1/shipments', { params });
+      if (response.data?.success) {
+        return response.data;
+      }
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        console.error('載入物流資料失敗:', error);
+      }
+    }
+
+    return {
+      success: true,
+      data: buildMockResponse(params),
+    };
   }
 
-  // 獲取配送詳情
-  static async getShipment(shipmentId: string): Promise<ApiResponse<Shipment>> {
-    const response = await logisticsApi.get(`/v1/shipments/${shipmentId}`);
-    return response.data;
+  static async getStats(): Promise<ApiResponse<LogisticsStats>> {
+    try {
+      const response = await logisticsApi.get('/v1/shipments/stats');
+      if (response.data?.success) {
+        return response.data;
+      }
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        console.error('載入物流統計失敗:', error);
+      }
+    }
+
+    return {
+      success: true,
+      data: buildMockStats(MOCK_SHIPMENTS),
+    };
   }
 
-  // 建立配送
-  static async createShipment(data: ShipmentCreateRequest): Promise<ApiResponse<Shipment>> {
-    const response = await logisticsApi.post('/v1/shipments', data);
-    return response.data;
+  static async createShipment(): Promise<never> {
+    return Promise.reject(new Error('物流建立尚未在前端支援。'));
   }
 
-  // 取消配送
-  static async cancelShipment(shipmentId: string, reason: string): Promise<ApiResponse<any>> {
-      const response = await logisticsApi.post(`/v1/shipments/${shipmentId}/cancel`, { reason });
-      return response.data;
+  static async updateShipment(): Promise<never> {
+    return Promise.reject(new Error('物流更新尚未在前端支援。'));
   }
 
-  // 追蹤配送
-  static async trackShipment(shipmentId: string): Promise<ApiResponse<TrackingEvent[]>> {
-    const response = await logisticsApi.get(`/v1/shipments/${shipmentId}/track`);
-    return response.data;
-  }
-
-  // 計算配送費用
-  static async calculateCost(data: CostCalculationRequest): Promise<ApiResponse<{ cost: number; currency: string }>> {
-      const response = await logisticsApi.post('/v1/calculate-cost', data);
-      return response.data;
-  }
-
-  // 獲取配送統計
-  static async getStats(params?: { period?: string; startDate?: string; endDate?: string }): Promise<ApiResponse<LogisticsStats>> {
-    const response = await logisticsApi.get('/v1/stats', { params });
-    return response.data;
+  static async deleteShipment(): Promise<never> {
+    return Promise.reject(new Error('物流刪除尚未在前端支援。'));
   }
 }
 

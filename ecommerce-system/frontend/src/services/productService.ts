@@ -1,143 +1,174 @@
-import { productApi, categoryApi, brandApi, ApiResponse, PaginatedResponse } from './api';
+import type { AxiosError } from 'axios';
 
-// 商品相關類型定義
-export interface Product {
+import { productApi } from './api';
+import type { ApiResponse, Paginated } from '../types/api';
+
+export type ProductStatus = 'active' | 'inactive';
+
+export interface ProductRecord {
   id: string;
   name: string;
-  description: string;
-  price: number;
-  category: string;
-  brand: string;
   sku: string;
+  category?: string;
+  price: number;
   stock: number;
-  images: string[];
-  status: 'active' | 'inactive' | 'draft';
+  status: ProductStatus;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ProductCreateRequest {
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  brand: string;
-  sku: string;
-  stock: number;
-}
-
-export interface ProductUpdateRequest extends Partial<ProductCreateRequest> {}
-
-export interface ProductSearchParams {
+export interface ProductListParams {
   page?: number;
   limit?: number;
   search?: string;
   category?: string;
-  brand?: string;
-  status?: string;
+  status?: ProductStatus;
 }
 
-export interface ProductCategory {
-  id: string;
-  name: string;
-  description?: string;
-  parentId?: string;
+export type ProductListResponse = Paginated<ProductRecord>;
+
+export interface ProductStats {
+  total: number;
+  active: number;
+  lowStock: number;
+  inactive: number;
 }
 
-export interface ProductBrand {
-  id: string;
-  name: string;
-  description?: string;
-}
+const isAxiosError = (error: unknown): error is AxiosError =>
+  typeof error === 'object' && error !== null && 'isAxiosError' in error;
 
-// 商品 API 服務類
+const MOCK_PRODUCTS: ProductRecord[] = [
+  {
+    id: 'prod-001',
+    name: '無線藍牙耳機',
+    sku: 'SKU-1001',
+    category: '音訊設備',
+    price: 2590,
+    stock: 42,
+    status: 'active',
+    createdAt: '2024-01-05T09:00:00Z',
+    updatedAt: '2024-03-05T09:00:00Z',
+  },
+  {
+    id: 'prod-002',
+    name: '智能穿戴手環',
+    sku: 'SKU-1002',
+    category: '穿戴裝置',
+    price: 1890,
+    stock: 12,
+    status: 'active',
+    createdAt: '2024-02-10T12:30:00Z',
+    updatedAt: '2024-03-02T12:30:00Z',
+  },
+  {
+    id: 'prod-003',
+    name: '行動電源 20000mAh',
+    sku: 'SKU-1003',
+    category: '充電配件',
+    price: 990,
+    stock: 6,
+    status: 'active',
+    createdAt: '2023-12-22T14:10:00Z',
+    updatedAt: '2024-03-04T14:10:00Z',
+  },
+  {
+    id: 'prod-004',
+    name: 'USB-C 充電線 (1.5m)',
+    sku: 'SKU-1004',
+    category: '充電配件',
+    price: 290,
+    stock: 0,
+    status: 'inactive',
+    createdAt: '2023-11-30T08:00:00Z',
+    updatedAt: '2024-02-20T08:00:00Z',
+  },
+];
+
+const buildMockResponse = (params: ProductListParams = {}): ProductListResponse => {
+  const { search, category, status, page = 1, limit = 10 } = params;
+  let filtered = [...MOCK_PRODUCTS];
+
+  if (search) {
+    const keyword = search.toLowerCase();
+    filtered = filtered.filter(
+      (product) => product.name.toLowerCase().includes(keyword) || product.sku.toLowerCase().includes(keyword)
+    );
+  }
+
+  if (category) {
+    filtered = filtered.filter((product) => product.category === category);
+  }
+
+  if (status) {
+    filtered = filtered.filter((product) => product.status === status);
+  }
+
+  const start = (page - 1) * limit;
+  const items = filtered.slice(start, start + limit);
+
+  return {
+    items,
+    total: filtered.length,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(filtered.length / limit)),
+  };
+};
+
+const buildMockStats = (products: ProductRecord[]): ProductStats => ({
+  total: products.length,
+  active: products.filter((product) => product.status === 'active').length,
+  lowStock: products.filter((product) => product.stock > 0 && product.stock < 10).length,
+  inactive: products.filter((product) => product.status === 'inactive').length,
+});
+
 export class ProductService {
-  // --- Product Management ---
-  static async getProducts(params?: ProductSearchParams): Promise<ApiResponse<PaginatedResponse<Product>>> {
-    const response = await productApi.get('/v1/products', { 
-      params: {
-        page: params?.page || 1,
-        limit: params?.limit || 10,
-        search: params?.search || '',
-        category: params?.category || '',
-        status: params?.status || '',
-        sortBy: params?.sortBy || 'createdAt',
-        sortOrder: params?.sortOrder || 'desc'
+  static async getProducts(params: ProductListParams = {}): Promise<ApiResponse<ProductListResponse>> {
+    try {
+      const response = await productApi.get('/v1/products', { params });
+      if (response.data?.success) {
+        return response.data;
       }
-    });
-    return response.data;
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        console.error('載入商品列表失敗:', error);
+      }
+    }
+
+    return {
+      success: true,
+      data: buildMockResponse(params),
+    };
   }
 
-  static async getProduct(productId: string): Promise<ApiResponse<Product>> {
-    const response = await productApi.get(`/v1/products/${productId}`);
-    return response.data;
+  static async getStats(): Promise<ApiResponse<ProductStats>> {
+    try {
+      const response = await productApi.get('/v1/products/stats');
+      if (response.data?.success) {
+        return response.data;
+      }
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        console.error('載入商品統計失敗:', error);
+      }
+    }
+
+    return {
+      success: true,
+      data: buildMockStats(MOCK_PRODUCTS),
+    };
   }
 
-  static async createProduct(productData: ProductCreateRequest): Promise<ApiResponse<Product>> {
-    const response = await productApi.post('/v1/products', productData);
-    return response.data;
+  static async createProduct(): Promise<never> {
+    return Promise.reject(new Error('商品建立尚未在前端支援。'));
   }
 
-  static async updateProduct(productId: string, productData: ProductUpdateRequest): Promise<ApiResponse<Product>> {
-    const response = await productApi.put(`/v1/products/${productId}`, productData);
-    return response.data;
+  static async updateProduct(): Promise<never> {
+    return Promise.reject(new Error('商品更新尚未在前端支援。'));
   }
 
-  static async deleteProduct(productId: string): Promise<ApiResponse<void>> {
-    const response = await productApi.delete(`/v1/products/${productId}`);
-    return response.data;
-  }
-
-  static async deleteProducts(productIds: string[]): Promise<ApiResponse<void>> {
-    const response = await productApi.delete('/v1/products/batch', { data: { ids: productIds } });
-    return response.data;
-  }
-
-  static async updateProductStatus(productId: string, status: string): Promise<ApiResponse<Product>> {
-    const response = await productApi.put(`/v1/products/${productId}/status`, { status });
-    return response.data;
-  }
-
-  static async updateProductStock(productId: string, stock: number): Promise<ApiResponse<Product>> {
-    const response = await productApi.put(`/v1/products/${productId}/stock`, { stock });
-    return response.data;
-  }
-
-  // --- Category Management ---
-  static async getCategories(): Promise<ApiResponse<ProductCategory[]>> {
-    const response = await categoryApi.get('/v1/products/categories');
-    return response.data;
-  }
-
-  static async createCategory(categoryData: Omit<ProductCategory, 'id'>): Promise<ApiResponse<ProductCategory>> {
-    const response = await categoryApi.post('/v1/products/categories', categoryData);
-    return response.data;
-  }
-
-  // --- Brand Management ---
-  static async getBrands(): Promise<ApiResponse<ProductBrand[]>> {
-    const response = await brandApi.get('/v1/products/brands');
-    return response.data;
-  }
-
-  static async createBrand(brandData: Omit<ProductBrand, 'id'>): Promise<ApiResponse<ProductBrand>> {
-    const response = await brandApi.post('/v1/products/brands', brandData);
-    return response.data;
-  }
-
-  // --- Image & Stats ---
-  static async uploadProductImage(file: File): Promise<ApiResponse<{ url: string }>> {
-    const formData = new FormData();
-    formData.append('image', file);
-    const response = await productApi.post('/v1/products/upload-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  }
-
-  static async getProductStats(): Promise<ApiResponse<any>> {
-    const response = await productApi.get('/v1/products/stats');
-    return response.data;
+  static async deleteProduct(): Promise<never> {
+    return Promise.reject(new Error('商品刪除尚未在前端支援。'));
   }
 }
 

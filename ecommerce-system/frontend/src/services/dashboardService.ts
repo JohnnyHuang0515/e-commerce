@@ -1,4 +1,6 @@
-import { dashboardApi, ApiResponse, PaginatedResponse } from './api';
+import { dashboardApi } from './api';
+
+import { ApiResponse, PaginatedResponse, DashboardOverview } from '../types/api';
 
 // Dashboard 數據類型定義
 export interface DashboardStats {
@@ -13,37 +15,7 @@ export interface DashboardStats {
   usersGrowth: number;
 }
 
-export interface OverviewData {
-  summary: {
-    totalSales: number;
-    totalOrders: number;
-    totalUsers: number;
-    totalProducts: number;
-    averageOrderValue: number;
-    conversionRate: number;
-  };
-  periodData: Array<{
-    date: string;
-    sales: number;
-    orders: number;
-    users: number;
-  }>;
-  growth: {
-    salesGrowth: number;
-    ordersGrowth: number;
-    usersGrowth: number;
-  };
-  alerts: Array<Alert>;
-  systemStatus: {
-    services: Array<{
-      name: string;
-      status: 'healthy' | 'warning' | 'error';
-      responseTime: number;
-      lastCheck: string;
-      data?: any;
-    }>;
-  };
-}
+export type OverviewData = DashboardOverview;
 
 export interface RealtimeData {
   activeUsers: number;

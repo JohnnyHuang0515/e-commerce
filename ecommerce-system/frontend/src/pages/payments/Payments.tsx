@@ -1,562 +1,301 @@
-import React, { useState } from 'react';
-import {
-  Table,
-  Button,
-  Space,
-  Tag,
-  Modal,
-  Form,
-  Input,
-  Select,
-  InputNumber,
-  DatePicker,
-  message,
-  Popconfirm,
-  Tooltip,
-} from 'antd';
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  EyeOutlined,
-  UndoOutlined,
-  SearchOutlined,
-  DollarOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined
-} from '@ant-design/icons';
-import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
-import { usePayments, useCreatePayment, useUpdatePayment, useDeletePayment, useRefundPayment } from '../../hooks/useApi';
-import { Payment, PaymentCreateRequest } from '../../services/paymentService';
+import React, { useMemo, useState } from 'react';
+import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
+import { DollarOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 
+import UnifiedPageLayout from '../../components/common/UnifiedPageLayout';
+import {
+  usePayments,
+  usePaymentStats,
+  type PaymentListParams,
+} from '../../hooks/usePayments';
+import type { PaymentRecord, PaymentStatus, PaymentMethod } from '../../services/paymentService';
+
 const { Option } = Select;
-const { RangePicker } = DatePicker;
+const { Text } = Typography;
+
+interface PaymentFilterForm {
+  orderId?: string;
+  userId?: string;
+  status?: PaymentStatus;
+  method?: PaymentMethod;
+}
+
+const statusConfig: Record<PaymentStatus, { color: string; text: string }> = {
+  pending: { color: 'orange', text: '待處理' },
+  processing: { color: 'blue', text: '處理中' },
+  completed: { color: 'green', text: '已完成' },
+  failed: { color: 'red', text: '失敗' },
+  cancelled: { color: 'default', text: '已取消' },
+  refunded: { color: 'purple', text: '已退款' },
+};
+
+const methodLabels: Record<PaymentMethod, string> = {
+  credit_card: '信用卡',
+  paypal: 'PayPal',
+  line_pay: 'LINE Pay',
+  bank_transfer: '銀行轉帳',
+  cash_on_delivery: '貨到付款',
+};
 
 const Payments: React.FC = () => {
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-  const [isRefundModalVisible, setIsRefundModalVisible] = useState(false);
-  const [refundPayment, setRefundPayment] = useState<Payment | null>(null);
-  const [searchParams, setSearchParams] = useState<any>({});
-  const [form] = Form.useForm();
-  const [refundForm] = Form.useForm();
+  const [filters, setFilters] = useState<PaymentListParams>({ page: 1, limit: 10 });
+  const [filterForm] = Form.useForm<PaymentFilterForm>();
+  const [viewingPayment, setViewingPayment] = useState<PaymentRecord | null>(null);
 
-  const { data: paymentsData, isLoading, refetch } = usePayments(searchParams);
-  const createPaymentMutation = useCreatePayment();
-  const updatePaymentMutation = useUpdatePayment();
-  const deletePaymentMutation = useDeletePayment();
-  const refundPaymentMutation = useRefundPayment();
+  const { data: paymentsResponse, isLoading, refetch } = usePayments(filters);
+  const { data: statsResponse } = usePaymentStats();
 
-  const handleAdd = () => {
-    setEditingPayment(null);
-    form.resetFields();
-    setIsModalVisible(true);
-  };
+  const payments = paymentsResponse?.data.items ?? [];
+  const pagination = paymentsResponse?.data;
+  const stats = statsResponse?.data;
 
-  const handleEdit = (payment: Payment) => {
-    setEditingPayment(payment);
-    form.setFieldsValue({
-      ...payment,
-      amount: payment.amount / 100, // 轉換為元
-    });
-    setIsModalVisible(true);
-  };
-
-  const handleRefund = (payment: Payment) => {
-    setRefundPayment(payment);
-    refundForm.resetFields();
-    setIsRefundModalVisible(true);
-  };
-
-  const handleSubmit = async (values: any) => {
-    try {
-      const paymentData: PaymentCreateRequest = {
-        orderId: values.orderId,
-        userId: values.userId,
-        amount: Math.round(values.amount * 100), // 轉換為分
-        currency: values.currency || 'TWD',
-        paymentMethod: values.paymentMethod,
-        paymentProvider: values.paymentProvider,
-        metadata: values.metadata,
-      };
-
-      if (editingPayment) {
-        await updatePaymentMutation.mutateAsync({
-          paymentId: editingPayment._id,
-          data: paymentData,
-        });
-        message.success('支付更新成功');
-      } else {
-        await createPaymentMutation.mutateAsync(paymentData);
-        message.success('支付創建成功');
-      }
-
-      setIsModalVisible(false);
-      form.resetFields();
-    } catch (error) {
-      message.error('操作失敗');
-    }
-  };
-
-  const handleRefundSubmit = async (values: any) => {
-    if (!refundPayment) return;
-
-    try {
-      await refundPaymentMutation.mutateAsync({
-        paymentId: refundPayment._id,
-        amount: Math.round(values.amount * 100),
-        reason: values.reason,
-        metadata: values.metadata,
-      });
-      message.success('退款成功');
-      setIsRefundModalVisible(false);
-      refundForm.resetFields();
-    } catch (error) {
-      message.error('退款失敗');
-    }
-  };
-
-  const handleDelete = async (paymentId: string) => {
-    try {
-      await deletePaymentMutation.mutateAsync(paymentId);
-      message.success('支付刪除成功');
-    } catch (error) {
-      message.error('刪除失敗');
-    }
-  };
-
-  const handleSearch = (values: any) => {
-    setSearchParams({
-      ...values,
-      startDate: values.dateRange?.[0]?.format('YYYY-MM-DD'),
-      endDate: values.dateRange?.[1]?.format('YYYY-MM-DD'),
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'orange',
-      processing: 'blue',
-      completed: 'green',
-      failed: 'red',
-      cancelled: 'gray',
-      refunded: 'purple',
-    };
-    return colors[status] || 'default';
-  };
-
-  const getStatusText = (status: string) => {
-    const texts: Record<string, string> = {
-      pending: '待處理',
-      processing: '處理中',
-      completed: '已完成',
-      failed: '失敗',
-      cancelled: '已取消',
-      refunded: '已退款',
-    };
-    return texts[status] || status;
-  };
-
-  const columns: ColumnsType<Payment> = [
-    {
-      title: '支付ID',
-      dataIndex: '_id',
-      key: '_id',
-      width: 100,
-      render: (id: string) => (
-        <Tooltip title={id}>
-          <span style={{ fontFamily: 'monospace' }}>{id.slice(-8)}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '訂單ID',
-      dataIndex: 'orderId',
-      key: 'orderId',
-      width: 100,
-      render: (orderId: string) => (
-        <Tooltip title={orderId}>
-          <span style={{ fontFamily: 'monospace' }}>{orderId.slice(-8)}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '用戶ID',
-      dataIndex: 'userId',
-      key: 'userId',
-      width: 100,
-      render: (userId: string) => (
-        <Tooltip title={userId}>
-          <span style={{ fontFamily: 'monospace' }}>{userId.slice(-8)}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '金額',
-      dataIndex: 'amount',
-      key: 'amount',
-      width: 120,
-      render: (amount: number, record: Payment) => (
-        <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
-          {record.currency} {(amount / 100).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => (
-        <Tag color={getStatusColor(status)}>
-          {getStatusText(status)}
-        </Tag>
-      ),
-    },
-    {
-      title: '支付方式',
-      dataIndex: 'paymentMethod',
-      key: 'paymentMethod',
-      width: 120,
-      render: (method: string) => {
-        const methodTexts: Record<string, string> = {
-          credit_card: '信用卡',
-          debit_card: '簽帳卡',
-          paypal: 'PayPal',
-          line_pay: 'Line Pay',
-          bank_transfer: '銀行轉帳',
-        };
-        return methodTexts[method] || method;
+  const columns: ColumnsType<PaymentRecord> = useMemo(
+    () => [
+      {
+        title: '支付 ID',
+        dataIndex: 'id',
+        key: 'id',
+        width: 160,
+        render: (id: string) => <Text code>{id}</Text>,
       },
-    },
-    {
-      title: '支付商',
-      dataIndex: 'paymentProvider',
-      key: 'paymentProvider',
-      width: 100,
-      render: (provider: string) => {
-        const providerTexts: Record<string, string> = {
-          stripe: 'Stripe',
-          paypal: 'PayPal',
-          line_pay: 'Line Pay',
-          bank: '銀行',
-        };
-        return providerTexts[provider] || provider;
+      {
+        title: '訂單 ID',
+        dataIndex: 'orderId',
+        key: 'orderId',
+        width: 140,
+        render: (value: string) => <Text code>{value}</Text>,
       },
-    },
-    {
-      title: '交易ID',
-      dataIndex: 'transactionId',
-      key: 'transactionId',
-      width: 120,
-      render: (transactionId: string) => (
-        transactionId ? (
-          <Tooltip title={transactionId}>
-            <span style={{ fontFamily: 'monospace' }}>{transactionId.slice(-8)}</span>
-          </Tooltip>
-        ) : '-'
-      ),
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 150,
-      render: (date: string) => new Date(date).toLocaleString(),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 150,
-      fixed: 'right',
-      render: (_, record: Payment) => (
-        <Space size="small">
-          <Tooltip title="查看詳情">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="編輯">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          {record.status === 'completed' && (
-            <Tooltip title="退款">
-              <Button
-                type="text"
-                icon={<UndoOutlined />}
-                onClick={() => handleRefund(record)}
-              />
-            </Tooltip>
-          )}
-          <Popconfirm
-            title="確定要刪除這個支付記錄嗎？"
-            onConfirm={() => handleDelete(record._id)}
-            okText="確定"
-            cancelText="取消"
-          >
-            <Tooltip title="刪除">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+      {
+        title: '用戶 ID',
+        dataIndex: 'userId',
+        key: 'userId',
+        width: 140,
+        render: (value: string) => <Text code>{value}</Text>,
+      },
+      {
+        title: '金額',
+        dataIndex: 'amount',
+        key: 'amount',
+        width: 120,
+        render: (amount: number, record) => (
+          <Text strong>
+            {record.currency} {(amount / 100).toFixed(2)}
+          </Text>
+        ),
+      },
+      {
+        title: '支付方式',
+        dataIndex: 'method',
+        key: 'method',
+        width: 140,
+        render: (method: PaymentMethod) => <Tag color="blue">{methodLabels[method]}</Tag>,
+      },
+      {
+        title: '狀態',
+        dataIndex: 'status',
+        key: 'status',
+        width: 140,
+        render: (status: PaymentStatus) => (
+          <Tag color={statusConfig[status].color}>{statusConfig[status].text}</Tag>
+        ),
+      },
+      {
+        title: '建立時間',
+        dataIndex: 'createdAt',
+        key: 'createdAt',
+        width: 180,
+        render: (value: string) => new Date(value).toLocaleString(),
+      },
+      {
+        title: '操作',
+        key: 'actions',
+        width: 100,
+        render: (_, record) => (
+          <Button type="link" onClick={() => setViewingPayment(record)}>
+            查看
+          </Button>
+        ),
+      },
+    ],
+    []
+  );
 
-  // 統計數據配置
-  const payments = paymentsData?.data?.items || [];
   const statsConfig = [
     {
-      label: '總支付',
-      value: payments.length,
+      label: '支付總筆數',
+      value: stats?.total ?? payments.length,
       icon: <DollarOutlined />,
-      color: 'var(--text-primary)'
+      color: 'var(--primary-500)',
     },
     {
-      label: '成功支付',
-      value: payments.filter(p => p.status === 'completed').length,
-      icon: <CheckCircleOutlined />,
-      color: 'var(--success-500)'
+      label: '完成支付',
+      value: stats?.completed ?? payments.filter((item) => item.status === 'completed').length,
+      icon: <DollarOutlined />,
+      color: 'var(--success-500)',
     },
     {
       label: '待處理',
-      value: payments.filter(p => p.status === 'pending').length,
-      icon: <ClockCircleOutlined />,
-      color: 'var(--warning-500)'
+      value: stats?.pending ?? payments.filter((item) => item.status === 'pending').length,
+      icon: <DollarOutlined />,
+      color: 'var(--warning-500)',
     },
     {
-      label: '失敗支付',
-      value: payments.filter(p => p.status === 'failed').length,
-      icon: <ExclamationCircleOutlined />,
-      color: 'var(--error-500)'
-    }
+      label: '已退款',
+      value: stats?.refunded ?? payments.filter((item) => item.status === 'refunded').length,
+      icon: <DollarOutlined />,
+      color: 'var(--info-500)',
+    },
   ];
 
-  // 操作按鈕
-  const extraActions = (
-    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-      新增支付
-    </Button>
-  );
+  function handleFilterSubmit(values: PaymentFilterForm) {
+    setFilters((prev) => ({
+      ...prev,
+      page: 1,
+      orderId: values.orderId?.trim() || undefined,
+      userId: values.userId?.trim() || undefined,
+      status: values.status || undefined,
+      method: values.method || undefined,
+    }));
+  }
+
+  function handleTableChange(page: number, pageSize?: number) {
+    setFilters((prev) => ({
+      ...prev,
+      page,
+      limit: pageSize ?? prev.limit,
+    }));
+  }
 
   return (
     <UnifiedPageLayout
-      title="支付管理"
-      subtitle="管理訂單支付和退款處理"
-      extra={extraActions}
+      title="支付紀錄"
+      subtitle="檢視近期支付情況與交易狀態"
       stats={statsConfig}
-      onRefresh={() => refetch()}
       loading={isLoading}
-    >
-
-        <Form
+      extra={
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
+            重新整理
+          </Button>
+        </Space>
+      }
+      filters={
+        <Form<PaymentFilterForm>
           layout="inline"
-          onFinish={handleSearch}
-          style={{ marginBottom: 16 }}
+          form={filterForm}
+          onFinish={handleFilterSubmit}
+          style={{ display: 'flex', gap: 12 }}
         >
+          <Form.Item name="orderId">
+            <Input placeholder="訂單 ID" allowClear style={{ width: 160 }} />
+          </Form.Item>
+          <Form.Item name="userId">
+            <Input placeholder="用戶 ID" allowClear style={{ width: 160 }} />
+          </Form.Item>
           <Form.Item name="status">
-            <Select placeholder="支付狀態" allowClear style={{ width: 120 }}>
-              <Option value="pending">待處理</Option>
-              <Option value="processing">處理中</Option>
-              <Option value="completed">已完成</Option>
-              <Option value="failed">失敗</Option>
-              <Option value="cancelled">已取消</Option>
-              <Option value="refunded">已退款</Option>
+            <Select placeholder="狀態" allowClear style={{ width: 160 }}>
+              {Object.entries(statusConfig).map(([value, config]) => (
+                <Option key={value} value={value}>
+                  {config.text}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
-          <Form.Item name="paymentMethod">
-            <Select placeholder="支付方式" allowClear style={{ width: 120 }}>
-              <Option value="credit_card">信用卡</Option>
-              <Option value="debit_card">簽帳卡</Option>
-              <Option value="paypal">PayPal</Option>
-              <Option value="line_pay">Line Pay</Option>
-              <Option value="bank_transfer">銀行轉帳</Option>
+          <Form.Item name="method">
+            <Select placeholder="支付方式" allowClear style={{ width: 160 }}>
+              {Object.entries(methodLabels).map(([value, label]) => (
+                <Option key={value} value={value}>
+                  {label}
+                </Option>
+              ))}
             </Select>
-          </Form.Item>
-          <Form.Item name="paymentProvider">
-            <Select placeholder="支付商" allowClear style={{ width: 120 }}>
-              <Option value="stripe">Stripe</Option>
-              <Option value="paypal">PayPal</Option>
-              <Option value="line_pay">Line Pay</Option>
-              <Option value="bank">銀行</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="dateRange">
-            <RangePicker />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-              搜尋
+              篩選
             </Button>
           </Form.Item>
         </Form>
-
-        <Table
+      }
+    >
+      <Card bordered={false}>
+        <Table<PaymentRecord>
+          rowKey={(record) => record.id}
           columns={columns}
-          dataSource={paymentsData?.data?.items || []}
+          dataSource={payments}
           loading={isLoading}
-          rowKey="_id"
-          scroll={{ x: 1200 }}
           pagination={{
-            total: paymentsData?.data?.total || 0,
-            pageSize: paymentsData?.data?.limit || 10,
-            current: paymentsData?.data?.page || 1,
+            total: pagination?.total ?? payments.length,
+            pageSize: pagination?.limit ?? filters.limit ?? 10,
+            current: pagination?.page ?? filters.page ?? 1,
+            onChange: handleTableChange,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) =>
-              `第 ${range[0]}-${range[1]} 項，共 ${total} 項`,
           }}
         />
+      </Card>
 
-      {/* 新增/編輯支付 Modal */}
       <Modal
-        title={editingPayment ? '編輯支付' : '新增支付'}
-        open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
+        open={Boolean(viewingPayment)}
+        title="支付詳情"
+        onCancel={() => setViewingPayment(null)}
         footer={null}
-        width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
-          <Form.Item
-            name="orderId"
-            label="訂單ID"
-            rules={[{ required: true, message: '請輸入訂單ID' }]}
-          >
-            <Input placeholder="請輸入訂單ID" />
-          </Form.Item>
-          <Form.Item
-            name="userId"
-            label="用戶ID"
-            rules={[{ required: true, message: '請輸入用戶ID' }]}
-          >
-            <Input placeholder="請輸入用戶ID" />
-          </Form.Item>
-          <Form.Item
-            name="amount"
-            label="金額"
-            rules={[{ required: true, message: '請輸入金額' }]}
-          >
-            <InputNumber
-              placeholder="請輸入金額"
-              min={0}
-              precision={2}
-              style={{ width: '100%' }}
-              addonAfter="元"
-            />
-          </Form.Item>
-          <Form.Item
-            name="currency"
-            label="貨幣"
-            initialValue="TWD"
-          >
-            <Select>
-              <Option value="TWD">台幣 (TWD)</Option>
-              <Option value="USD">美元 (USD)</Option>
-              <Option value="EUR">歐元 (EUR)</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="paymentMethod"
-            label="支付方式"
-            rules={[{ required: true, message: '請選擇支付方式' }]}
-          >
-            <Select placeholder="請選擇支付方式">
-              <Option value="credit_card">信用卡</Option>
-              <Option value="debit_card">簽帳卡</Option>
-              <Option value="paypal">PayPal</Option>
-              <Option value="line_pay">Line Pay</Option>
-              <Option value="bank_transfer">銀行轉帳</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="paymentProvider"
-            label="支付商"
-            rules={[{ required: true, message: '請選擇支付商' }]}
-          >
-            <Select placeholder="請選擇支付商">
-              <Option value="stripe">Stripe</Option>
-              <Option value="paypal">PayPal</Option>
-              <Option value="line_pay">Line Pay</Option>
-              <Option value="bank">銀行</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={createPaymentMutation.isPending || updatePaymentMutation.isPending}>
-                {editingPayment ? '更新' : '創建'}
-              </Button>
-              <Button onClick={() => setIsModalVisible(false)}>
-                取消
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* 退款 Modal */}
-      <Modal
-        title="退款"
-        open={isRefundModalVisible}
-        onCancel={() => setIsRefundModalVisible(false)}
-        footer={null}
-        width={500}
-      >
-        <Form
-          form={refundForm}
-          layout="vertical"
-          onFinish={handleRefundSubmit}
-        >
-          <Form.Item
-            name="amount"
-            label="退款金額"
-            rules={[{ required: true, message: '請輸入退款金額' }]}
-          >
-            <InputNumber
-              placeholder="請輸入退款金額"
-              min={0}
-              max={refundPayment ? refundPayment.amount / 100 : undefined}
-              precision={2}
-              style={{ width: '100%' }}
-              addonAfter="元"
-            />
-          </Form.Item>
-          <Form.Item
-            name="reason"
-            label="退款原因"
-            rules={[{ required: true, message: '請輸入退款原因' }]}
-          >
-            <Input.TextArea
-              placeholder="請輸入退款原因"
-              rows={3}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" loading={refundPaymentMutation.isPending}>
-                確認退款
-              </Button>
-              <Button onClick={() => setIsRefundModalVisible(false)}>
-                取消
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+        {viewingPayment && (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <div>
+              <Text type="secondary">支付 ID</Text>
+              <div><Text code>{viewingPayment.id}</Text></div>
+            </div>
+            <div>
+              <Text type="secondary">訂單 ID</Text>
+              <div><Text code>{viewingPayment.orderId}</Text></div>
+            </div>
+            <div>
+              <Text type="secondary">用戶 ID</Text>
+              <div><Text code>{viewingPayment.userId}</Text></div>
+            </div>
+            <div>
+              <Text type="secondary">金額</Text>
+              <div>
+                <Text strong>
+                  {viewingPayment.currency} {(viewingPayment.amount / 100).toFixed(2)}
+                </Text>
+              </div>
+            </div>
+            <div>
+              <Text type="secondary">支付方式</Text>
+              <Tag color="blue">{methodLabels[viewingPayment.method]}</Tag>
+            </div>
+            <div>
+              <Text type="secondary">狀態</Text>
+              <Tag color={statusConfig[viewingPayment.status].color}>
+                {statusConfig[viewingPayment.status].text}
+              </Tag>
+            </div>
+            {viewingPayment.provider && (
+              <div>
+                <Text type="secondary">支付平台</Text>
+                <div>{viewingPayment.provider}</div>
+              </div>
+            )}
+            {viewingPayment.transactionId && (
+              <div>
+                <Text type="secondary">交易序號</Text>
+                <div><Text code>{viewingPayment.transactionId}</Text></div>
+              </div>
+            )}
+            <div>
+              <Text type="secondary">建立時間</Text>
+              <div>{new Date(viewingPayment.createdAt).toLocaleString()}</div>
+            </div>
+            <div>
+              <Text type="secondary">更新時間</Text>
+              <div>{new Date(viewingPayment.updatedAt).toLocaleString()}</div>
+            </div>
+          </Space>
+        )}
       </Modal>
     </UnifiedPageLayout>
   );

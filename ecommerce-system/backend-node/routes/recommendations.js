@@ -1,10 +1,7 @@
 const express = require('express');
-const { 
-  authenticateToken,
-  mongoClient,
-  redisClient,
-  getIdMapping 
-} = require('../config/database');
+const { mongoClient, redisClient } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const { getIdMapping } = require('../utils/idMapper');
 const { checkPermission } = require('../middleware/rbac');
 const { asyncHandler, NotFoundError } = require('../middleware/errorHandler');
 

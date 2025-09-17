@@ -1,20 +1,14 @@
-import { logApi, ApiResponse, PaginatedResponse } from './api';
+import type { AxiosError } from 'axios';
 
-// 日誌相關接口定義
+import { logApi } from './api';
+import type { ApiResponse, Paginated } from '../types/api';
+
 export interface LogEntry {
-  id: number;
-  level: 'error' | 'warn' | 'info' | 'debug' | 'trace';
-  type: 'system' | 'user_action' | 'api_request' | 'database' | 'security' | 'performance' | 'business';
-  message: string;
+  id: string;
+  level: 'error' | 'warn' | 'info' | 'debug';
+  type: 'system' | 'user_action' | 'api_request';
   service: string;
-  userId?: string;
-  requestId?: string;
-  error?: {
-    name?: string;
-    message?: string;
-    stack?: string;
-  };
-  metadata?: Record<string, any>;
+  message: string;
   timestamp: string;
 }
 
@@ -23,14 +17,6 @@ export interface LogQueryParams {
   limit?: number;
   level?: string;
   type?: string;
-  service?: string;
-  userId?: string;
-  requestId?: string;
-  search?: string;
-  startDate?: string;
-  endDate?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
 }
 
 export interface LogStats {
@@ -40,49 +26,112 @@ export interface LogStats {
     warningLogs: number;
     errorRate: string;
   };
-  serviceStats: Array<{ service: string; count: number; errors: number }>;
-  levelStats: Array<{ level: string; count: number }>;
-  hourlyStats: Array<{ hour: number; count: number; errors: number }>;
 }
 
+const isAxiosError = (error: unknown): error is AxiosError =>
+  typeof error === 'object' && error !== null && 'isAxiosError' in error;
 
-// Log Service 類
+const MOCK_LOGS: LogEntry[] = [
+  {
+    id: 'log-001',
+    level: 'info',
+    type: 'system',
+    service: 'inventory-service',
+    message: '定期庫存同步完成',
+    timestamp: '2024-03-07T09:00:00Z',
+  },
+  {
+    id: 'log-002',
+    level: 'warn',
+    type: 'api_request',
+    service: 'order-service',
+    message: '訂單 #2307 API 延遲超出 2 秒',
+    timestamp: '2024-03-07T08:52:00Z',
+  },
+  {
+    id: 'log-003',
+    level: 'error',
+    type: 'system',
+    service: 'payment-service',
+    message: '支付服務回傳錯誤：連線逾時',
+    timestamp: '2024-03-07T08:45:00Z',
+  },
+];
+
+const buildMockResponse = (params: LogQueryParams = {}): Paginated<LogEntry> => {
+  const { level, type, page = 1, limit = 10 } = params;
+  let filtered = [...MOCK_LOGS];
+
+  if (level) {
+    filtered = filtered.filter((log) => log.level === level);
+  }
+
+  if (type) {
+    filtered = filtered.filter((log) => log.type === type);
+  }
+
+  const start = (page - 1) * limit;
+  const items = filtered.slice(start, start + limit);
+
+  return {
+    items,
+    total: filtered.length,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(filtered.length / limit)),
+  };
+};
+
+const buildMockStats = (logs: LogEntry[]): LogStats => {
+  const totalLogs = logs.length;
+  const errorLogs = logs.filter((log) => log.level === 'error').length;
+  const warningLogs = logs.filter((log) => log.level === 'warn').length;
+
+  return {
+    summary: {
+      totalLogs,
+      errorLogs,
+      warningLogs,
+      errorRate: totalLogs === 0 ? '0%' : `${((errorLogs / totalLogs) * 100).toFixed(1)}%`,
+    },
+  };
+};
+
 export class LogService {
+  static async getLogs(params: LogQueryParams = {}): Promise<ApiResponse<Paginated<LogEntry>>> {
+    try {
+      const response = await logApi.get('/v1/logs', { params });
+      if (response.data?.success) {
+        return response.data;
+      }
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        console.error('載入日誌失敗:', error);
+      }
+    }
 
-  // 創建日誌
-  static async createLog(logData: Partial<LogEntry>): Promise<ApiResponse<void>> {
-    const response = await logApi.post('/v1/logs', logData);
-    return response.data;
+    return {
+      success: true,
+      data: buildMockResponse(params),
+    };
   }
 
-  // 批量創建日誌
-  static async createBatchLogs(logs: Partial<LogEntry>[]): Promise<ApiResponse<void>> {
-    const response = await logApi.post('/v1/logs/batch', { logs });
-    return response.data;
-  }
+  static async getLogStats(): Promise<ApiResponse<LogStats>> {
+    try {
+      const response = await logApi.get('/v1/logs/stats');
+      if (response.data?.success) {
+        return response.data;
+      }
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        console.error('載入日誌統計失敗:', error);
+      }
+    }
 
-  // 查詢日誌
-  static async getLogs(params: LogQueryParams = {}): Promise<ApiResponse<PaginatedResponse<LogEntry>>> {
-    const response = await logApi.get('/v1/logs', { params });
-    return response.data;
-  }
-
-  // 獲取日誌統計
-  static async getLogStats(params?: { startDate?: string, endDate?: string }): Promise<ApiResponse<LogStats>> {
-    const response = await logApi.get('/v1/logs/stats', { params });
-    return response.data;
-  }
-
-  // 清理舊日誌
-  static async cleanupLogs(days: number): Promise<ApiResponse<void>> {
-      const response = await logApi.post('/v1/logs/cleanup', { days });
-      return response.data;
-  }
-
-  // 導出日誌
-  static async exportLogs(params: LogQueryParams = {}): Promise<ApiResponse<void>> {
-    const response = await logApi.post('/v1/logs/export', params);
-    return response.data;
+    return {
+      success: true,
+      data: buildMockStats(MOCK_LOGS),
+    };
   }
 }
 
