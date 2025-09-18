@@ -1,6 +1,4 @@
-import type { AxiosError } from 'axios';
-
-import { analyticsApi } from './api';
+import { dashboardApi } from './api';
 import type { ApiResponse } from '../types/api';
 
 export interface AnalyticsSummary {
@@ -29,46 +27,56 @@ export interface AnalyticsDashboard {
   topProducts: TopProduct[];
 }
 
-const isAxiosError = (error: unknown): error is AxiosError =>
-  typeof error === 'object' && error !== null && 'isAxiosError' in error;
-
-const MOCK_DASHBOARD: AnalyticsDashboard = {
-  summary: {
-    revenue: 1254300,
-    orders: 892,
-    customers: 640,
-    conversionRate: 0.043,
-  },
-  salesTrend: Array.from({ length: 7 }).map((_, index) => ({
-    date: new Date(Date.now() - (6 - index) * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10),
-    sales: 120000 + Math.round(Math.random() * 30000),
-    orders: 90 + Math.round(Math.random() * 25),
-  })),
-  topProducts: [
-    { id: 'prod-001', name: '無線藍牙耳機', sales: 120000, percentage: 0.28 },
-    { id: 'prod-002', name: '智能穿戴手環', sales: 98000, percentage: 0.22 },
-    { id: 'prod-003', name: '行動電源 20000mAh', sales: 72000, percentage: 0.16 },
-  ],
-};
-
 export class AnalyticsService {
   static async getDashboard(): Promise<ApiResponse<AnalyticsDashboard>> {
-    try {
-      const response = await analyticsApi.get('/v1/dashboard/overview');
-      if (response.data?.success) {
-        return response.data;
-      }
-    } catch (error) {
-      if (!isAxiosError(error)) {
-        console.error('載入分析儀表板失敗:', error);
-      }
-    }
+    const [overviewResponse, popularResponse] = await Promise.all([
+      dashboardApi.get('/v1/dashboard/overview'),
+      dashboardApi.get('/v1/dashboard/popular-products'),
+    ]);
+
+    const overview = overviewResponse.data?.data;
+    const popularProducts = popularResponse.data?.data ?? [];
+
+    const totalSales = overview?.summary?.totalSales ?? 0;
+    const totalOrders = overview?.summary?.totalOrders ?? 0;
+    const totalUsers = overview?.summary?.totalUsers ?? 0;
+    const conversionRateRaw = overview?.summary?.conversionRate ?? 0;
+
+    const salesTrend: SalesTrendPoint[] = (overview?.periodData ?? []).map((point: any) => ({
+      date: point.date,
+      sales: Number(point.sales ?? 0),
+      orders: Number(point.orders ?? 0),
+    }));
+
+    const totalTopSales = popularProducts.reduce(
+      (acc: number, product: any) => acc + Number(product.totalSales ?? 0),
+      0
+    );
+
+    const topProducts: TopProduct[] = popularProducts.map((product: any) => {
+      const sales = Number(product.totalSales ?? 0);
+      return {
+        id: product.id,
+        name: product.name,
+        sales,
+        percentage: totalTopSales > 0 ? sales / totalTopSales : 0,
+      };
+    });
+
+    const dashboard: AnalyticsDashboard = {
+      summary: {
+        revenue: totalSales,
+        orders: totalOrders,
+        customers: totalUsers,
+        conversionRate: conversionRateRaw / 100,
+      },
+      salesTrend,
+      topProducts,
+    };
 
     return {
       success: true,
-      data: MOCK_DASHBOARD,
+      data: dashboard,
     };
   }
 }

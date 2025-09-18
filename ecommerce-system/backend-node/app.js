@@ -18,6 +18,9 @@ const recommendationRoutes = require('./routes/recommendations');
 const dashboardRoutes = require('./routes/dashboard');
 const categoryRoutes = require('./routes/categories');
 const inventoryRoutes = require('./routes/inventory');
+const notificationRoutes = require('./routes/notifications');
+const logRoutes = require('./routes/logs');
+const utilityRoutes = require('./routes/utility');
 const paymentRoutes = require('./routes/payments');
 const shipmentRoutes = require('./routes/shipments');
 
@@ -197,6 +200,9 @@ app.use('/api/v1/recommendations', recommendationRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/logs', logRoutes);
+app.use('/api/v1/utility', utilityRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/shipments', shipmentRoutes);
 

@@ -1,641 +1,257 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
-const { 
-  postgresPool, 
-  mongoClient,
-} = require('../config/database');
+
+const { postgresPool, mongoClient } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { getIdMapping } = require('../utils/idMapper');
 const { checkPermission } = require('../middleware/rbac');
-const { asyncHandler, ValidationError, NotFoundError } = require('../middleware/errorHandler');
+const { asyncHandler, NotFoundError } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-/**
- * @swagger
- * /api/v1/products:
- *   get:
- *     summary: 獲取商品列表
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: 頁碼
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: 每頁數量
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: 搜尋關鍵字
- *       - in: query
- *         name: category_id
- *         schema:
- *           type: integer
- *         description: 分類 ID
- *       - in: query
- *         name: status
- *         schema:
- *           type: integer
- *         description: 商品狀態
- *     responses:
- *       200:
- *         description: 獲取成功
- */
-router.get('/', authenticateToken, checkPermission('view_products'), asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, search = '', category, category_id, status } = req.query;
-  const offset = (page - 1) * limit;
-  
-  let whereClause = '';
-  let queryParams = [];
-  let paramIndex = 1;
-  
-  if (search) {
-    whereClause += ` AND (p.name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`;
-    queryParams.push(`%${search}%`);
-    paramIndex++;
-  }
-  
-  if (category || category_id) {
-    const categoryValue = parseInt(category || category_id);
-    if (!isNaN(categoryValue)) {
-      whereClause += ` AND p.category_id = $${paramIndex}`;
-      queryParams.push(categoryValue);
-      paramIndex++;
-    }
-  }
-  
-  if (status !== undefined && status !== '') {
-    const statusValue = parseInt(status);
-    if (!isNaN(statusValue)) {
-      whereClause += ` AND p.status = $${paramIndex}`;
-      queryParams.push(statusValue);
-      paramIndex++;
-    }
-  }
-  
-  // 查詢商品列表
-  const result = await postgresPool.query(`
-    SELECT 
-      p.product_id,
-      p.public_id,
-      p.name,
-      p.description,
-      p.price,
-      p.sku,
-      p.stock_quantity,
-      p.status,
-      p.created_at,
-      p.updated_at,
-      c.name as category_name,
-      p.brand_id as brand
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.category_id
-    WHERE 1=1 ${whereClause}
-    ORDER BY p.created_at DESC
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-  `, [...queryParams, limit, offset]);
-  
-  // 查詢總數
-  const countResult = await postgresPool.query(`
-    SELECT COUNT(*) as total
-    FROM products p
-    WHERE 1=1 ${whereClause}
-  `, queryParams);
-  
-  const total = parseInt(countResult.rows[0].total);
-  
-  res.json({
-    success: true,
-    data: {
-      items: result.rows,
-      total,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(total / limit)
-    }
-  });
-}));
+const STATUS_ACTIVE = ['active'];
+const STATUS_INACTIVE = ['inactive', 'sold_out'];
 
-/**
- * @swagger
- * /api/v1/products/{publicId}:
- *   get:
- *     summary: 獲取商品詳情
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: publicId
- *         required: true
- *         schema:
- *           type: string
- *         description: 商品公開 ID
- *     responses:
- *       200:
- *         description: 獲取成功
- *       404:
- *         description: 商品不存在
- */
-router.get('/:publicId', authenticateToken, checkPermission('view_products'), asyncHandler(async (req, res) => {
-  const { publicId } = req.params;
-  
-  // 獲取商品基本信息
-  const productResult = await postgresPool.query(`
-    SELECT 
-      p.product_id,
-      p.public_id,
-      p.name,
-      p.description,
-      p.price,
-      p.sku,
-      p.stock_quantity,
-      p.status,
-      p.created_at,
-      p.updated_at,
-      c.name as category_name
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.category_id
-    WHERE p.public_id = $1
-  `, [publicId]);
-  
-  if (productResult.rows.length === 0) {
-    throw new NotFoundError('商品不存在');
+const mapStatusFromDb = (status) => {
+  if (!status) {
+    return 'inactive';
   }
-  
-  const product = productResult.rows[0];
-  
-  // 獲取商品圖片
-  const imagesResult = await postgresPool.query(`
-    SELECT image_id, public_id, image_url, is_main
-    FROM product_images
-    WHERE product_id = $1
-    ORDER BY is_main DESC, created_at ASC
-  `, [product.product_id]);
-  
-  // 從 MongoDB 獲取詳細信息
-  let productDetails = null;
-  try {
-    const detailsCollection = mongoClient.db('ecommerce').collection('product_details');
-    productDetails = await detailsCollection.findOne({ product_id: product.product_id });
-  } catch (error) {
-    console.error('獲取商品詳細信息失敗:', error);
-  }
-  
-  res.json({
-    success: true,
-    data: {
-      ...product,
-      images: imagesResult.rows,
-      details: productDetails
-    }
-  });
-}));
 
-/**
- * @swagger
- * /api/v1/products:
- *   post:
- *     summary: 創建新商品
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - description
- *               - price
- *               - sku
- *             properties:
- *               name:
- *                 type: string
- *               description:
- *                 type: string
- *               price:
- *                 type: number
- *               sku:
- *                 type: string
- *               category_id:
- *                 type: integer
- *               stock_quantity:
- *                 type: integer
- *               attributes:
- *                 type: object
- *     responses:
- *       201:
- *         description: 創建成功
- *       400:
- *         description: 請求數據無效
- */
-router.post('/', authenticateToken, checkPermission('create_product'), asyncHandler(async (req, res) => {
-  const { name, description, price, sku, category_id, stock_quantity = 0, attributes = {} } = req.body;
-  
-  if (!name || !description || !price || !sku) {
-    throw new ValidationError('請提供商品名稱、描述、價格和 SKU');
+  const value = status.toString().toLowerCase();
+  if (STATUS_ACTIVE.includes(value)) {
+    return 'active';
   }
-  
-  if (price < 0) {
-    throw new ValidationError('商品價格不能為負數');
-  }
-  
-  if (stock_quantity < 0) {
-    throw new ValidationError('庫存數量不能為負數');
-  }
-  
-  // 檢查 SKU 是否已存在
-  const existingProduct = await postgresPool.query(`
-    SELECT product_id FROM products WHERE sku = $1
-  `, [sku]);
-  
-  if (existingProduct.rows.length > 0) {
-    throw new ValidationError('SKU 已被使用');
-  }
-  
-  // 生成公開 ID
-  const publicId = uuidv4();
-  
-  // 創建商品
-  const result = await postgresPool.query(`
-    INSERT INTO products (name, description, price, sku, category_id, stock_quantity, public_id, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
-    RETURNING product_id, public_id, name, description, price, sku, stock_quantity, status, created_at
-  `, [name, description, price, sku, category_id, stock_quantity, publicId]);
-  
-  const newProduct = result.rows[0];
-  
-  // 在 MongoDB 中創建詳細信息
-  try {
-    await mongoClient.db('ecommerce').collection('product_details').insertOne({
-      product_id: newProduct.product_id,
-      attributes,
-      description_html: description,
-      version: 1,
-      created_at: new Date(),
-      updated_at: new Date()
-    });
-  } catch (error) {
-    console.error('創建商品詳細信息失敗:', error);
-  }
-  
-  // 記錄創建事件
-  try {
-    await mongoClient.db('ecommerce').collection('user_events').insertOne({
-      user_id: req.user.user_id,
-      event_type: 'product_created',
-      event_data: {
-        product_id: newProduct.product_id,
-        product_name: newProduct.name,
-        ip: req.ip,
-        user_agent: req.get('User-Agent'),
-        timestamp: new Date()
+
+  return 'inactive';
+};
+
+const normalizeProductRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  sku: row.sku,
+  category: row.category_name || undefined,
+  price: Number(row.price) || 0,
+  stock: Number(row.stock) || 0,
+  status: mapStatusFromDb(row.status),
+  createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+  updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+});
+
+router.get(
+  '/',
+  authenticateToken,
+  checkPermission('products:read'),
+  asyncHandler(async (req, res) => {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      category,
+      status,
+    } = req.query;
+
+    const numericPage = Number(page) || 1;
+    const numericLimit = Number(limit) || 10;
+    const offset = (numericPage - 1) * numericLimit;
+
+    const conditions = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (search) {
+      conditions.push(`(p.name ILIKE $${paramIndex} OR p.sku ILIKE $${paramIndex})`);
+      params.push(`%${search.trim()}%`);
+      paramIndex += 1;
+    }
+
+    if (category) {
+      conditions.push(`(c.name ILIKE $${paramIndex})`);
+      params.push(`%${category.trim()}%`);
+      paramIndex += 1;
+    }
+
+    if (status) {
+      if (status === 'active') {
+        conditions.push(`p.status = ANY($${paramIndex})`);
+        params.push(STATUS_ACTIVE);
+      } else if (status === 'inactive') {
+        conditions.push(`p.status = ANY($${paramIndex})`);
+        params.push(STATUS_INACTIVE);
+      }
+      paramIndex += 1;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const listQuery = `
+      WITH inventory_totals AS (
+        SELECT product_id, SUM(quantity) AS stock
+        FROM inventory
+        GROUP BY product_id
+      )
+      SELECT 
+        p.id,
+        p.name,
+        p.sku,
+        p.price,
+        p.status,
+        p.created_at,
+        p.updated_at,
+        c.name AS category_name,
+        COALESCE(it.stock, 0) AS stock
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN inventory_totals it ON it.product_id = p.id
+      ${whereClause}
+      ORDER BY p.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+
+    const listParams = [...params, numericLimit, offset];
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      ${whereClause}`;
+
+    const [listResult, countResult] = await Promise.all([
+      postgresPool.query(listQuery, listParams),
+      postgresPool.query(countQuery, params),
+    ]);
+
+    const total = Number(countResult.rows[0]?.total || 0);
+
+    res.json({
+      success: true,
+      data: {
+        items: listResult.rows.map(normalizeProductRow),
+        total,
+        page: numericPage,
+        limit: numericLimit,
+        totalPages: Math.max(1, Math.ceil(total / numericLimit)),
       },
-      created_at: new Date()
     });
-  } catch (error) {
-    console.error('記錄商品創建事件失敗:', error);
-  }
-  
-  res.status(201).json({
-    success: true,
-    data: newProduct,
-    message: '商品創建成功'
-  });
-}));
+  })
+);
 
-/**
- * @swagger
- * /api/v1/products/{publicId}:
- *   put:
- *     summary: 更新商品
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: publicId
- *         required: true
- *         schema:
- *           type: string
- *         description: 商品公開 ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               description:
- *                 type: string
- *               price:
- *                 type: number
- *               sku:
- *                 type: string
- *               category_id:
- *                 type: integer
- *               stock_quantity:
- *                 type: integer
- *               status:
- *                 type: integer
- *               attributes:
- *                 type: object
- *     responses:
- *       200:
- *         description: 更新成功
- *       404:
- *         description: 商品不存在
- */
-router.put('/:publicId', authenticateToken, checkPermission('update_product'), asyncHandler(async (req, res) => {
-  const { publicId } = req.params;
-  const { name, description, price, sku, category_id, stock_quantity, status, attributes } = req.body;
-  
-  // 獲取商品信息
-  const productResult = await postgresPool.query(`
-    SELECT product_id FROM products WHERE public_id = $1
-  `, [publicId]);
-  
-  if (productResult.rows.length === 0) {
-    throw new NotFoundError('商品不存在');
-  }
-  
-  const productId = productResult.rows[0].product_id;
-  
-  // 檢查 SKU 是否被其他商品使用
-  if (sku) {
-    const existingProduct = await postgresPool.query(`
-      SELECT product_id FROM products WHERE sku = $1 AND product_id != $2
-    `, [sku, productId]);
-    
-    if (existingProduct.rows.length > 0) {
-      throw new ValidationError('SKU 已被其他商品使用');
+router.get(
+  '/stats',
+  authenticateToken,
+  checkPermission('products:read'),
+  asyncHandler(async (_req, res) => {
+    const [productStatsResult, inventoryStatsResult] = await Promise.all([
+      postgresPool.query(
+        `SELECT 
+           COUNT(*) AS total,
+           COUNT(*) FILTER (WHERE status = ANY($1)) AS active,
+           COUNT(*) FILTER (WHERE status = ANY($2)) AS inactive
+         FROM products`,
+        [STATUS_ACTIVE, STATUS_INACTIVE]
+      ),
+      postgresPool.query(
+        `SELECT COUNT(*) AS low_stock
+         FROM inventory
+         WHERE quantity > 0 AND quantity < 10`
+      ),
+    ]);
+
+    const totals = productStatsResult.rows[0] || {};
+    const lowStock = Number(inventoryStatsResult.rows[0]?.low_stock || 0);
+
+    res.json({
+      success: true,
+      data: {
+        total: Number(totals.total || 0),
+        active: Number(totals.active || 0),
+        inactive: Number(totals.inactive || 0),
+        lowStock,
+      },
+    });
+  })
+);
+
+router.get(
+  '/:productId',
+  authenticateToken,
+  checkPermission('products:read'),
+  asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+
+    const productResult = await postgresPool.query(
+      `WITH inventory_totals AS (
+         SELECT product_id, SUM(quantity) AS stock
+         FROM inventory
+         GROUP BY product_id
+       )
+       SELECT 
+         p.id,
+         p.name,
+         p.description,
+         p.sku,
+         p.price,
+         p.status,
+         p.created_at,
+         p.updated_at,
+         c.name AS category_name,
+         COALESCE(it.stock, 0) AS stock
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN inventory_totals it ON it.product_id = p.id
+       WHERE p.id::text = $1 OR p.sku = $1
+       LIMIT 1`,
+      [productId]
+    );
+
+    if (productResult.rowCount === 0) {
+      throw new NotFoundError('找不到指定的商品');
     }
-  }
-  
-  // 更新商品基本信息
-  const updateFields = [];
-  const updateValues = [];
-  let paramIndex = 1;
-  
-  if (name !== undefined) {
-    updateFields.push(`name = $${paramIndex}`);
-    updateValues.push(name);
-    paramIndex++;
-  }
-  
-  if (description !== undefined) {
-    updateFields.push(`description = $${paramIndex}`);
-    updateValues.push(description);
-    paramIndex++;
-  }
-  
-  if (price !== undefined) {
-    if (price < 0) {
-      throw new ValidationError('商品價格不能為負數');
-    }
-    updateFields.push(`price = $${paramIndex}`);
-    updateValues.push(price);
-    paramIndex++;
-  }
-  
-  if (sku !== undefined) {
-    updateFields.push(`sku = $${paramIndex}`);
-    updateValues.push(sku);
-    paramIndex++;
-  }
-  
-  if (category_id !== undefined) {
-    updateFields.push(`category_id = $${paramIndex}`);
-    updateValues.push(category_id);
-    paramIndex++;
-  }
-  
-  if (stock_quantity !== undefined) {
-    if (stock_quantity < 0) {
-      throw new ValidationError('庫存數量不能為負數');
-    }
-    updateFields.push(`stock_quantity = $${paramIndex}`);
-    updateValues.push(stock_quantity);
-    paramIndex++;
-  }
-  
-  if (status !== undefined) {
-    updateFields.push(`status = $${paramIndex}`);
-    updateValues.push(status);
-    paramIndex++;
-  }
-  
-  if (updateFields.length === 0) {
-    throw new ValidationError('沒有提供要更新的資料');
-  }
-  
-  updateFields.push(`updated_at = NOW()`);
-  updateValues.push(productId);
-  
-  await postgresPool.query(`
-    UPDATE products
-    SET ${updateFields.join(', ')}
-    WHERE product_id = $${paramIndex}
-  `, updateValues);
-  
-  // 更新 MongoDB 中的詳細信息
-  if (attributes !== undefined || description !== undefined) {
+
+    const product = productResult.rows[0];
+    let details = null;
+
     try {
-      const updateData = {};
-      if (attributes !== undefined) {
-        updateData.attributes = attributes;
-      }
-      if (description !== undefined) {
-        updateData.description_html = description;
-      }
-      updateData.updated_at = new Date();
-      
-      await mongoClient.db('ecommerce').collection('product_details').updateOne(
-        { product_id: productId },
-        { $set: updateData }
-      );
+      details = await mongoClient
+        .db('ecommerce')
+        .collection('product_details')
+        .findOne({ product_id: product.id });
     } catch (error) {
-      console.error('更新商品詳細信息失敗:', error);
+      console.warn('讀取商品詳細資訊失敗:', error.message);
     }
-  }
-  
-  // 記錄更新事件
-  try {
-    await mongoClient.db('ecommerce').collection('user_events').insertOne({
-      user_id: req.user.user_id,
-      event_type: 'product_updated',
-      event_data: {
-        product_id: productId,
-        changes: { name, description, price, sku, category_id, stock_quantity, status },
-        ip: req.ip,
-        user_agent: req.get('User-Agent'),
-        timestamp: new Date()
+
+    res.json({
+      success: true,
+      data: {
+        ...normalizeProductRow(product),
+        description: product.description,
+        details: details || undefined,
       },
-      created_at: new Date()
     });
-  } catch (error) {
-    console.error('記錄商品更新事件失敗:', error);
-  }
-  
-  res.json({
-    success: true,
-    message: '商品更新成功'
-  });
-}));
+  })
+);
 
-/**
- * @swagger
- * /api/v1/products/{publicId}:
- *   delete:
- *     summary: 刪除商品（軟刪除）
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: publicId
- *         required: true
- *         schema:
- *           type: string
- *         description: 商品公開 ID
- *     responses:
- *       200:
- *         description: 刪除成功
- *       404:
- *         description: 商品不存在
- */
-router.delete('/:publicId', authenticateToken, checkPermission('delete_product'), asyncHandler(async (req, res) => {
-  const { publicId } = req.params;
-  
-  // 獲取商品信息
-  const productResult = await postgresPool.query(`
-    SELECT product_id, name FROM products WHERE public_id = $1
-  `, [publicId]);
-  
-  if (productResult.rows.length === 0) {
-    throw new NotFoundError('商品不存在');
-  }
-  
-  const { product_id, name } = productResult.rows[0];
-  
-  // 軟刪除商品
-  await postgresPool.query(`
-    UPDATE products
-    SET status = 0, updated_at = NOW()
-    WHERE product_id = $1
-  `, [product_id]);
-  
-  // 記錄刪除事件
-  try {
-    await mongoClient.db('ecommerce').collection('user_events').insertOne({
-      user_id: req.user.user_id,
-      event_type: 'product_deleted',
-      event_data: {
-        product_id,
-        product_name: name,
-        ip: req.ip,
-        user_agent: req.get('User-Agent'),
-        timestamp: new Date()
-      },
-      created_at: new Date()
-    });
-  } catch (error) {
-    console.error('記錄商品刪除事件失敗:', error);
-  }
-  
-  res.json({
-    success: true,
-    message: '商品刪除成功'
-  });
-}));
+router.post(
+  '/',
+  authenticateToken,
+  checkPermission('products:create'),
+  asyncHandler(async (_req, res) => {
+    res.status(501).json({ success: false, error: '商品建立尚未在後端解鎖' });
+  })
+);
 
-/**
- * @swagger
- * /api/v1/categories:
- *   get:
- *     summary: 獲取分類列表
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: 獲取成功
- */
-router.get('/categories', authenticateToken, checkPermission('view_products'), asyncHandler(async (req, res) => {
-  const result = await postgresPool.query(`
-    SELECT category_id, public_id, name, parent_id, created_at
-    FROM categories
-    ORDER BY name ASC
-  `);
-  
-  res.json({
-    success: true,
-    data: result.rows
-  });
-}));
+router.put(
+  '/:productId',
+  authenticateToken,
+  checkPermission('products:update'),
+  asyncHandler(async (_req, res) => {
+    res.status(501).json({ success: false, error: '商品更新尚未在後端解鎖' });
+  })
+);
 
-/**
- * @swagger
- * /api/v1/categories:
- *   post:
- *     summary: 創建新分類
- *     tags: [Products]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *               parent_id:
- *                 type: integer
- *     responses:
- *       201:
- *         description: 創建成功
- */
-router.post('/categories', authenticateToken, checkPermission('create_product'), asyncHandler(async (req, res) => {
-  const { name, parent_id } = req.body;
-  
-  if (!name) {
-    throw new ValidationError('請提供分類名稱');
-  }
-  
-  // 生成公開 ID
-  const publicId = uuidv4();
-  
-  // 創建分類
-  const result = await postgresPool.query(`
-    INSERT INTO categories (name, parent_id, public_id)
-    VALUES ($1, $2, $3)
-    RETURNING category_id, public_id, name, parent_id, created_at
-  `, [name, parent_id, publicId]);
-  
-  res.status(201).json({
-    success: true,
-    data: result.rows[0],
-    message: '分類創建成功'
-  });
-}));
+router.delete(
+  '/:productId',
+  authenticateToken,
+  checkPermission('products:delete'),
+  asyncHandler(async (_req, res) => {
+    res.status(501).json({ success: false, error: '商品刪除尚未在後端解鎖' });
+  })
+);
 
 module.exports = router;
